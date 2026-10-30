@@ -1,0 +1,57 @@
+/* ============================================================
+   Light Theme（暖白纸张）——默认
+   浅色主题以暖白、象牙白、墨黑为基础，强调纸张质感与复古气息。
+   ============================================================ */
+:root {
+  color-scheme: light;
+
+  --bg-primary: #f7f5f0;
+  --bg-secondary: #efece4;
+  --bg-card: #ffffff;
+  --bg-elevated: #ffffff;
+
+  --text-primary: #171715;
+  --text-secondary: #41413d;
+  --text-muted: #92918b;
+
+  --border-default: #e5e2da;
+
+  --accent-primary: #9a8052; /* Antique Brass 古铜金 */
+  --accent-danger: #754747; /* Vintage Burgundy 酒红 */
+  --accent-olive: #77735d; /* Olive Gray 橄榄灰 */
+
+  --glass-bg: rgba(255, 255, 255, 0.62);
+  --glass-border: rgba(255, 255, 255, 0.72);
+
+  --shadow-card: 0 4px 16px rgba(23, 23, 21, 0.05);
+  --shadow-floating: 0 12px 32px rgba(23, 23, 21, 0.1);
+}
+
+/* ============================================================
+   Dark Theme（复古墨黑）
+   深色主题采用复古墨黑风格，保留材质感，避免纯黑压迫。
+   ============================================================ */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg-primary: #111110;
+  --bg-secondary: #191917;
+  --bg-card: #242421;
+  --bg-elevated: #2d2d29;
+
+  --text-primary: #f1eee6;
+  --text-secondary: #dcd8ce;
+  --text-muted: #96948b;
+
+  --border-default: #383833;
+
+  --accent-primary: #b49a6b;
+  --accent-danger: #a16b6b;
+  --accent-olive: #969078;
+
+  --glass-bg: rgba(25, 25, 23, 0.78);
+  --glass-border: rgba(255, 255, 255, 0.1);
+
+  --shadow-card: 0 4px 16px rgba(0, 0, 0, 0.16);
+  --shadow-floating: 0 12px 32px rgba(0, 0, 0, 0.3);
+}

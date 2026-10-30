@@ -1,0 +1,18 @@
+/* 玻璃材质：复古玻璃拟态核心视觉。
+   仅用于导航栏、搜索框、下拉、弹窗、浮层等合适位置，避免正文/编辑器过度透明。 */
+
+.glass-panel {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-card);
+}
+
+.glass-floating {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-floating);
+}

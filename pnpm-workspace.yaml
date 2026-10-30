@@ -1,0 +1,8 @@
+packages:
+  - '.'
+
+# pnpm 10+ 将依赖构建脚本白名单移至此处。
+# vue-demi 的 postinstall 会按已安装的 Vue 版本切换导出入口，
+# 不运行会导致 pinia 在运行时报错，因此必须允许其执行。
+onlyBuiltDependencies:
+  - vue-demi

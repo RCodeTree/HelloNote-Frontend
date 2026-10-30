@@ -1,0 +1,110 @@
+/* ============================================================
+   工具类与全局动效
+   ============================================================ */
+
+/* 骨架屏微光动画 */
+@keyframes hn-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(
+    90deg,
+    var(--bg-secondary) 25%,
+    var(--bg-card) 50%,
+    var(--bg-secondary) 75%
+  );
+  background-size: 200% 100%;
+  animation: hn-shimmer 1.4s var(--ease-standard) infinite;
+}
+
+/* 页面切换过渡（配合 router-view 的 <Transition name="page">） */
+.page-enter-active,
+.page-leave-active {
+  transition:
+    opacity var(--duration-normal) var(--ease-standard),
+    transform var(--duration-normal) var(--ease-standard);
+}
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+.page-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+/* 浮层（下拉/菜单）过渡 */
+.dropdown-enter-active,
+.dropdown-leave-active {
+  transition:
+    opacity var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
+}
+.dropdown-enter-from,
+.dropdown-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+/* 滚动条主题适配 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-default) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: var(--radius-full);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* 文本选区 */
+::selection {
+  background: var(--accent-primary);
+  color: #fff;
+}
+
+/* 主题切换时仅对界面元素做轻微过渡，避免大型编辑器/图片无差别过渡 */
+.theme-transition,
+.theme-transition * {
+  transition:
+    background-color var(--duration-normal) var(--ease-standard),
+    border-color var(--duration-normal) var(--ease-standard),
+    color var(--duration-normal) var(--ease-standard),
+    box-shadow var(--duration-normal) var(--ease-standard);
+}
+
+/* 尊重系统的减少动态效果设置 */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+  .page-enter-active,
+  .page-leave-active,
+  .dropdown-enter-active,
+  .dropdown-leave-active {
+    transition: none;
+  }
+  .theme-transition,
+  .theme-transition * {
+    transition: none;
+  }
+  * {
+    scroll-behavior: auto !important;
+  }
+}

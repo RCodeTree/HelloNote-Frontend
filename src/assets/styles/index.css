@@ -1,0 +1,11 @@
+/* Hello!Note 全局样式入口
+   顺序：先引入变量/主题/玻璃/排版/工具类，再注入 Tailwind 指令。 */
+@import "./variables.css";
+@import "./themes.css";
+@import "./glass.css";
+@import "./typography.css";
+@import "./utilities.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
