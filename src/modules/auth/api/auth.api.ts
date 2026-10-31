@@ -7,7 +7,7 @@ import type {
   RegisterPayload,
 } from '../types/auth.types'
 
-function mapUser(raw: RawUser): AuthUser {
+function mapUser(raw: RawUser): AuthUser { // 将后端返回的 snake_case 映射为前端 camelCase 领域模型
   return {
     id: raw.id,
     username: raw.username,
