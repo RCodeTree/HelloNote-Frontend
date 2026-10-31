@@ -1,15 +1,11 @@
 <script setup lang="ts">
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useAppStore } from '@/stores/app.store'
-import { useAuthStore } from '@/modules/auth'
 import AppIcon, { type IconName } from '@/components/common/AppIcon.vue'
 import AppLogo from '@/components/common/AppLogo.vue'
-import ThemeSwitcher from '@/components/feedback/ThemeSwitcher.vue'
 
 const app = useAppStore()
-const auth = useAuthStore()
-const router = useRouter()
 const route = useRoute()
 
 const { isMobile, mobileOpen, sidebarCollapsed } = storeToRefs(app)
@@ -24,15 +20,10 @@ const navItems: NavItem[] = [
   { to: '/', label: '首页', icon: 'home' },
   { to: '/dashboard', label: '面板', icon: 'grid' },
 ]
-
-function handleLogout(): void {
-  auth.logout()
-  router.push('/login')
-}
 </script>
 
 <template>
-  <!-- 移动端浮动菜单按钮 -->
+  <!-- 移动端浮动汉堡按钮 -->
   <button
     v-if="isMobile"
     class="sidebar-fab"
@@ -60,13 +51,14 @@ function handleLogout(): void {
       <RouterLink to="/" class="sidebar__brand" @click="app.closeMobile">
         <AppLogo :show-text="!sidebarCollapsed" />
       </RouterLink>
+      <!-- 汉堡包风格开关：桌面端折叠/展开侧栏，移动端关闭抽屉 -->
       <button
         v-if="!isMobile"
         class="sidebar__toggle"
         :aria-label="sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'"
         @click="app.toggleCollapsed"
       >
-        <AppIcon :name="sidebarCollapsed ? 'chevron-right' : 'chevron-left'" :size="18" />
+        <AppIcon name="menu" :size="18" />
       </button>
       <button v-else class="sidebar__toggle" aria-label="关闭菜单" @click="app.closeMobile">
         <AppIcon name="close" :size="18" />
@@ -92,23 +84,6 @@ function handleLogout(): void {
         <span class="sidebar__link-label">笔记</span>
       </div>
     </nav>
-
-    <div class="sidebar__footer">
-      <ThemeSwitcher />
-
-      <div v-if="auth.isAuthenticated" class="sidebar__user">
-        <span class="sidebar__user-name">{{ auth.user?.displayName }}</span>
-        <button class="sidebar__logout" @click="handleLogout">
-          <AppIcon name="logout" :size="16" />
-          <span v-if="!sidebarCollapsed">退出</span>
-        </button>
-      </div>
-
-      <RouterLink v-else to="/login" class="sidebar__login" @click="app.closeMobile">
-        <AppIcon name="user" :size="18" />
-        <span v-if="!sidebarCollapsed">登录</span>
-      </RouterLink>
-    </div>
   </aside>
 </template>
 
@@ -129,6 +104,7 @@ function handleLogout(): void {
   backdrop-filter: blur(8px);
   transition: width var(--duration-base) var(--ease-standard);
   z-index: 40;
+  overflow: hidden;
 }
 .sidebar--collapsed {
   width: 76px;
@@ -140,17 +116,22 @@ function handleLogout(): void {
   justify-content: space-between;
   gap: var(--space-2);
   padding: var(--space-2);
+  min-height: 44px;
+}
+.sidebar--collapsed .sidebar__top {
+  flex-direction: column;
+  gap: var(--space-3);
 }
 .sidebar--collapsed .sidebar__brand {
   justify-content: center;
-  width: 100%;
 }
 .sidebar__toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-default);
   background: var(--bg-secondary);
@@ -168,6 +149,7 @@ function handleLogout(): void {
   flex-direction: column;
   gap: var(--space-1);
   flex: 1;
+  min-height: 0;
 }
 .sidebar__link {
   display: flex;
@@ -178,6 +160,7 @@ function handleLogout(): void {
   color: var(--text-secondary);
   text-decoration: none;
   font-size: 14px;
+  white-space: nowrap;
   transition: all var(--duration-fast) var(--ease-standard);
 }
 .sidebar__link:hover {
@@ -204,68 +187,7 @@ function handleLogout(): void {
   color: var(--text-muted);
 }
 
-.sidebar__footer {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--border-default);
-}
-.sidebar--collapsed .sidebar__footer {
-  align-items: center;
-}
-.sidebar__login {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: 8px 12px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-default);
-  color: var(--text-secondary);
-  text-decoration: none;
-  font-size: 14px;
-  transition: all var(--duration-fast) var(--ease-standard);
-}
-.sidebar__login:hover {
-  color: var(--text-primary);
-  border-color: var(--accent-primary);
-}
-.sidebar__user {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-}
-.sidebar--collapsed .sidebar__user {
-  flex-direction: column;
-  gap: var(--space-2);
-}
-.sidebar__user-name {
-  font-size: 13px;
-  color: var(--text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.sidebar__logout {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-default);
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 13px;
-  cursor: pointer;
-  transition: all var(--duration-fast) var(--ease-standard);
-}
-.sidebar__logout:hover {
-  color: var(--danger, #9a4a3c);
-  border-color: var(--danger, #9a4a3c);
-}
-
-/* 移动端：抽屉 + 浮动按钮 + 遮罩 */
+/* 移动端：抽屉 + 浮动汉堡按钮 + 遮罩 */
 .sidebar-fab {
   position: fixed;
   top: var(--space-4);
