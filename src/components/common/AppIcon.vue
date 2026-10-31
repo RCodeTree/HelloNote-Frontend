@@ -11,6 +11,10 @@ export type IconName =
   | 'monitor'
   | 'menu'
   | 'close'
+  | 'user'
+  | 'logout'
+  | 'chevron-left'
+  | 'chevron-right'
   | 'pin'
   | 'plus'
   | 'check'
@@ -40,6 +44,10 @@ const paths: Record<IconName, string> = {
   monitor: 'M3 4h18v12H3zM8 20h8M12 16v4',
   menu: 'M4 7h16M4 12h16M4 17h16',
   close: 'M6 6l12 12M18 6 6 18',
+  user: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM5 20a7 7 0 0 1 14 0',
+  logout: 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9',
+  'chevron-left': 'M15 6l-6 6 6 6',
+  'chevron-right': 'M9 6l6 6-6 6',
   pin: 'M9 3h6l-1 6 4 3v2H6v-2l4-3z M12 14v7',
   plus: 'M12 5v14M5 12h14',
   check: 'M5 13l4 4L19 7',

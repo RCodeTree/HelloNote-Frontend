@@ -9,6 +9,7 @@ withDefaults(
     type?: 'button' | 'submit'
     disabled?: boolean
     block?: boolean
+    loading?: boolean
   }>(),
   {
     variant: 'primary',
@@ -16,6 +17,7 @@ withDefaults(
     type: 'button',
     disabled: false,
     block: false,
+    loading: false,
   },
 )
 
@@ -25,7 +27,7 @@ defineEmits<{ click: [event: MouseEvent] }>()
 <template>
   <button
     :type="type"
-    :disabled="disabled"
+    :disabled="disabled || loading"
     class="base-button"
     :class="[
       `base-button--${variant}`,
@@ -34,6 +36,7 @@ defineEmits<{ click: [event: MouseEvent] }>()
     ]"
     @click="$emit('click', $event)"
   >
+    <span v-if="loading" class="base-button__spinner" aria-hidden="true" />
     <slot />
   </button>
 </template>
@@ -104,11 +107,30 @@ defineEmits<{ click: [event: MouseEvent] }>()
 }
 
 .base-button--danger {
-  background: var(--accent-danger);
-  color: #fff;
-  border-color: var(--accent-danger);
+  background: var(--danger);
+  color: var(--bg-primary);
+  border-color: var(--danger);
 }
 .base-button--danger:hover:not(:disabled) {
   opacity: 0.9;
+}
+
+.base-button__spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: base-button-spin 0.6s linear infinite;
+}
+@keyframes base-button-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .base-button__spinner {
+    animation: none;
+  }
 }
 </style>

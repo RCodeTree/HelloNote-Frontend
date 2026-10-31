@@ -7,18 +7,24 @@ export const routes: RouteRecordRaw[] = [
     path: '/',
     name: 'home',
     component: () => import('@/modules/home/pages/HomePage.vue'),
-    meta: { title: '首页' },
+    meta: { title: '首页', layout: 'default' },
+  },
+  {
+    path: '/login',
+    name: 'login',
+    component: () => import('@/modules/auth/pages/LoginPage.vue'),
+    meta: { title: '登录', layout: 'blank' },
   },
   {
     path: '/dashboard',
     name: 'dashboard',
     component: () => import('@/modules/dashboard/pages/DashboardPage.vue'),
-    meta: { title: '面板' },
+    meta: { title: '面板', layout: 'default', requiresAuth: true },
   },
   {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
     component: () => import('@/modules/home/pages/NotFoundPage.vue'),
-    meta: { title: '页面未找到' },
+    meta: { title: '页面未找到', layout: 'default' },
   },
 ]
