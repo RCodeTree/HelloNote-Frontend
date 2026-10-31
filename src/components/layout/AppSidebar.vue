@@ -51,16 +51,8 @@ const navItems: NavItem[] = [
       <RouterLink to="/" class="sidebar__brand" @click="app.closeMobile">
         <AppLogo :show-text="!sidebarCollapsed" />
       </RouterLink>
-      <!-- 汉堡包风格开关：桌面端折叠/展开侧栏，移动端关闭抽屉 -->
-      <button
-        v-if="!isMobile"
-        class="sidebar__toggle"
-        :aria-label="sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'"
-        @click="app.toggleCollapsed"
-      >
-        <AppIcon name="menu" :size="18" />
-      </button>
-      <button v-else class="sidebar__toggle" aria-label="关闭菜单" @click="app.closeMobile">
+      <!-- 移动端抽屉：右上角关闭按钮 -->
+      <button v-if="isMobile" class="sidebar__close" aria-label="关闭菜单" @click="app.closeMobile">
         <AppIcon name="close" :size="18" />
       </button>
     </div>
@@ -84,6 +76,16 @@ const navItems: NavItem[] = [
         <span class="sidebar__link-label">笔记</span>
       </div>
     </nav>
+
+    <!-- 桌面端：收起/展开按钮悬浮于侧栏右侧垂直居中 -->
+    <button
+      v-if="!isMobile"
+      class="sidebar__midtoggle"
+      :aria-label="sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'"
+      @click="app.toggleCollapsed"
+    >
+      <AppIcon :name="sidebarCollapsed ? 'chevron-right' : 'chevron-left'" :size="16" />
+    </button>
   </aside>
 </template>
 
@@ -104,7 +106,6 @@ const navItems: NavItem[] = [
   backdrop-filter: blur(8px);
   transition: width var(--duration-base) var(--ease-standard);
   z-index: 40;
-  overflow: hidden;
 }
 .sidebar--collapsed {
   width: 76px;
@@ -119,19 +120,18 @@ const navItems: NavItem[] = [
   min-height: 44px;
 }
 .sidebar--collapsed .sidebar__top {
-  flex-direction: column;
-  gap: var(--space-3);
-}
-.sidebar--collapsed .sidebar__brand {
   justify-content: center;
 }
-.sidebar__toggle {
+.sidebar__brand {
+  display: inline-flex;
+  align-items: center;
+}
+.sidebar__close {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
-  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-default);
   background: var(--bg-secondary);
@@ -139,9 +139,8 @@ const navItems: NavItem[] = [
   cursor: pointer;
   transition: all var(--duration-fast) var(--ease-standard);
 }
-.sidebar__toggle:hover {
+.sidebar__close:hover {
   color: var(--text-primary);
-  border-color: var(--accent-primary);
 }
 
 .sidebar__nav {
@@ -185,6 +184,30 @@ const navItems: NavItem[] = [
 .sidebar__link--muted:hover {
   background: transparent;
   color: var(--text-muted);
+}
+
+/* 桌面端：悬浮于侧栏右侧垂直居中的收起/展开按钮 */
+.sidebar__midtoggle {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translate(50%, -50%);
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--border-default);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  box-shadow: var(--shadow-card);
+  transition: all var(--duration-fast) var(--ease-standard);
+}
+.sidebar__midtoggle:hover {
+  color: var(--text-primary);
+  border-color: var(--accent-primary);
 }
 
 /* 移动端：抽屉 + 浮动汉堡按钮 + 遮罩 */
