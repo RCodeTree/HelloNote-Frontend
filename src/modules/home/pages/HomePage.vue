@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { defineAsyncComponent } from 'vue'
-import HeroSection from './HeroSection.vue'
-import FeatureCard from './FeatureCard.vue'
+import HeroSection from '../components/HeroSection.vue'
+import FeatureCard from '../components/FeatureCard.vue'
 import SkeletonCard from '@/components/feedback/SkeletonCard.vue'
 import type { IconName } from '@/components/common/AppIcon.vue'
 
 // 组件级懒加载：HomePreviewPanel 单独打包为 chunk，
 // 加载该 chunk 期间以 SkeletonCard 作为骨架屏占位。
 const HomePreviewPanel = defineAsyncComponent({
-  loader: () => import('./HomePreviewPanel.vue'),
+  loader: () => import('../components/HomePreviewPanel.vue'),
   loadingComponent: SkeletonCard,
   delay: 150,
   timeout: 10000,
