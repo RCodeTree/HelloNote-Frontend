@@ -17,6 +17,12 @@ export const useAppStore = defineStore('app', () => {
     isMobile.value ? false : autoCollapsed.value || manualCollapsed.value,
   )
 
+  // 侧栏实际宽度（px）：用于笔记编辑抽屉等需贴合侧栏右缘的元素定位。
+  // 移动端侧栏为覆盖式抽屉，编辑区应占满全屏（宽度 0）。
+  const sidebarWidth = computed<number>(() =>
+    isMobile.value ? 0 : sidebarCollapsed.value ? 76 : 240,
+  )
+
   function toggleCollapsed(): void {
     manualCollapsed.value = !manualCollapsed.value
     localStorage.setItem(SIDEBAR_COLLAPSED_KEY, manualCollapsed.value ? '1' : '0')
@@ -50,6 +56,7 @@ export const useAppStore = defineStore('app', () => {
     autoCollapsed,
     mobileOpen,
     sidebarCollapsed,
+    sidebarWidth,
     toggleCollapsed,
     toggleMobile,
     closeMobile,

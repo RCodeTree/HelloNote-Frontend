@@ -22,6 +22,12 @@ export const routes: RouteRecordRaw[] = [
     meta: { title: '面板', layout: 'default', requiresAuth: true },
   },
   {
+    path: '/notes',
+    name: 'notes',
+    component: () => import('@/modules/notes/pages/NotesPage.vue'),
+    meta: { title: '笔记', layout: 'default', requiresAuth: true },
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
     component: () => import('@/modules/home/pages/NotFoundPage.vue'),

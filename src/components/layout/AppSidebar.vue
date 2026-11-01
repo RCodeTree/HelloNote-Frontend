@@ -71,10 +71,16 @@ const navItems: NavItem[] = [
         <span class="sidebar__link-label">{{ item.label }}</span>
       </RouterLink>
 
-      <div class="sidebar__link sidebar__link--muted" title="即将上线">
+      <RouterLink
+        to="/notes"
+        class="sidebar__link"
+        :class="{ 'is-active': route.path.startsWith('/notes') }"
+        :title="sidebarCollapsed && !isMobile ? '笔记' : undefined"
+        @click="app.closeMobile"
+      >
         <AppIcon name="note" :size="20" class="sidebar__link-icon" />
         <span class="sidebar__link-label">笔记</span>
-      </div>
+      </RouterLink>
     </nav>
 
     <!-- 桌面端：收起/展开按钮悬浮于侧栏右侧垂直居中 -->

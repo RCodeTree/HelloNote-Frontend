@@ -21,6 +21,9 @@ export type IconName =
   | 'chevron-down'
   | 'sparkles'
   | 'refresh'
+  | 'expand'
+  | 'contract'
+  | 'trash'
 </script>
 
 <script setup lang="ts">
@@ -55,6 +58,9 @@ const paths: Record<IconName, string> = {
   sparkles:
     'M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8zM19 14l.9 2.1L22 17l-2.1.9L19 20l-.9-2.1L16 17l2.1-.9z',
   refresh: 'M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6',
+  expand: 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5',
+  contract: 'M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5',
+  trash: 'M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6',
 }
 </script>
 
