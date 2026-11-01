@@ -12,14 +12,11 @@ import TagSelect from '../components/TagSelect.vue'
 import EditorToolbar, { type ToolCommand } from '../components/EditorToolbar.vue'
 import { mdToHtml } from '../utils/markdown'
 import { useToast } from '@/composables/useToast'
-import { useAppStore } from '@/stores/app.store'
 
 const route = useRoute()
 const router = useRouter()
 const store = useNotesStore()
-const appStore = useAppStore()
 const toast = useToast()
-const { isMobile } = storeToRefs(appStore)
 const { notes, tags, current, currentLoading, saving, error } = storeToRefs(store)
 
 const noteId = computed<number | null>(() => {
@@ -328,10 +325,6 @@ function formatDate(value: string | undefined): string {
     <!-- 顶栏：返回 / 笔记切换下拉 / 保存状态与操作 -->
     <header class="editor__topbar">
       <div class="editor__topbar-left">
-        <!-- 移动端菜单按钮：打开侧栏抽屉（编辑页隐藏全局 FAB，由此按钮承担） -->
-        <button v-if="isMobile" class="editor__iconbtn" title="打开菜单" @click="appStore.toggleMobile">
-          <AppIcon name="menu" :size="18" />
-        </button>
         <button class="editor__iconbtn" title="返回列表" @click="router.push('/notes')">
           <AppIcon name="chevron-left" :size="18" />
         </button>

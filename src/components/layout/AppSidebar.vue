@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useAppStore } from '@/stores/app.store'
@@ -11,9 +10,6 @@ const app = useAppStore()
 const route = useRoute()
 
 const { isMobile, mobileOpen, sidebarCollapsed } = storeToRefs(app)
-
-// 全幅页面（笔记编辑器）自带顶栏与菜单入口，隐藏全局浮动按钮避免重叠
-const fullBleed = computed(() => route.meta.fullBleed === true)
 
 interface NavItem {
   to: string
@@ -28,15 +24,14 @@ const navItems: NavItem[] = [
 </script>
 
 <template>
-  <!-- 移动端浮动汉堡按钮（编辑器等全幅页面隐藏，由页面自带菜单按钮承担） -->
+  <!-- 中小屏：侧边垂直居中悬浮小箭头，点击弹出侧栏抽屉；空闲时低调无高亮 -->
   <button
-    v-if="isMobile && !fullBleed"
-    class="sidebar-fab"
-    :class="{ 'is-hidden': mobileOpen }"
+    v-if="isMobile && !mobileOpen"
+    class="sidebar-midbtn"
     aria-label="打开菜单"
     @click="app.toggleMobile"
   >
-    <AppIcon name="menu" :size="20" />
+    <AppIcon name="chevron-right" :size="18" />
   </button>
 
   <!-- 移动端遮罩 -->
@@ -200,7 +195,7 @@ const navItems: NavItem[] = [
   color: var(--text-muted);
 }
 
-/* 桌面端：悬浮于侧栏右侧垂直居中的收起/展开按钮 */
+/* 大屏：侧栏右缘垂直居中的展开手柄 —— 点击即「靠近侧边弹出」完整侧栏 */
 .sidebar__midtoggle {
   position: absolute;
   top: 50%;
@@ -224,27 +219,31 @@ const navItems: NavItem[] = [
   border-color: var(--accent-primary);
 }
 
-/* 移动端：抽屉 + 浮动汉堡按钮 + 遮罩 */
-.sidebar-fab {
+/* 中小屏：侧边垂直居中悬浮小箭头 —— 默认低调、空闲无高亮，hover 才点亮 */
+.sidebar-midbtn {
   position: fixed;
-  top: var(--space-4);
-  left: var(--space-4);
-  z-index: 70;
-  width: 44px;
-  height: 44px;
-  display: flex;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 65;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-default);
-  background: var(--bg-card);
-  color: var(--text-primary);
+  width: 22px;
+  height: 46px;
+  border: none;
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  background: var(--bg-secondary);
+  color: var(--text-muted);
   cursor: pointer;
-  box-shadow: var(--shadow-card);
+  opacity: 0.5;
+  transition: all var(--duration-fast) var(--ease-standard);
 }
-.sidebar-fab.is-hidden {
-  opacity: 0;
-  pointer-events: none;
+.sidebar-midbtn:hover {
+  opacity: 1;
+  color: var(--accent-primary);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-card);
 }
 .sidebar-backdrop {
   position: fixed;
