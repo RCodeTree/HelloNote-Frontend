@@ -9,12 +9,17 @@ import BaseButton from '@/components/common/BaseButton.vue'
 import BaseTag from '@/components/common/BaseTag.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import TagSelect from '../components/TagSelect.vue'
+import EditorToolbar, { type ToolCommand } from '../components/EditorToolbar.vue'
+import { mdToHtml } from '../utils/markdown'
 import { useToast } from '@/composables/useToast'
+import { useAppStore } from '@/stores/app.store'
 
 const route = useRoute()
 const router = useRouter()
 const store = useNotesStore()
+const appStore = useAppStore()
 const toast = useToast()
+const { isMobile } = storeToRefs(appStore)
 const { notes, tags, current, currentLoading, saving, error } = storeToRefs(store)
 
 const noteId = computed<number | null>(() => {
@@ -182,6 +187,133 @@ watch(currentLoading, (v) => {
   if (!v) void nextTick(autosize)
 })
 
+// —— 富文本操作：Markdown 快捷插入 + 实时预览 ——
+const showPreview = ref(false)
+const previewHtml = computed(() => (showPreview.value ? mdToHtml(form.content) : ''))
+
+/** 应用内容与选区：写入后等 DOM 更新再聚焦恢复选区并重算高度 */
+function commitContent(next: string, selStart: number, selEnd: number): void {
+  form.content = next
+  void nextTick(() => {
+    const el = contentEl.value
+    if (!el) return
+    el.focus()
+    el.setSelectionRange(selStart, selEnd)
+    autosize()
+  })
+}
+
+/** 选区包裹语法（粗体/斜体/删除线/行内代码），已包裹则取消 */
+function surroundSelection(prefix: string, suffix = prefix, placeholder: string): void {
+  const el = contentEl.value
+  if (!el) return
+  const { selectionStart: s, selectionEnd: e } = el
+  const sel = form.content.slice(s, e)
+  if (sel.startsWith(prefix) && sel.endsWith(suffix) && sel.length >= prefix.length + suffix.length) {
+    const inner = sel.slice(prefix.length, sel.length - suffix.length)
+    commitContent(
+      form.content.slice(0, s) + inner + form.content.slice(e),
+      s,
+      s + inner.length,
+    )
+    return
+  }
+  const inner = sel || placeholder
+  commitContent(
+    form.content.slice(0, s) + prefix + inner + suffix + form.content.slice(e),
+    s + prefix.length,
+    s + prefix.length + inner.length,
+  )
+}
+
+/** 对选区覆盖的整行做转换（标题/引用/列表），带前缀互斥与切换 */
+function transformLines(transform: (line: string, index: number) => string): void {
+  const el = contentEl.value
+  if (!el) return
+  const value = form.content
+  const lineStart = value.lastIndexOf('\n', el.selectionStart - 1) + 1
+  let lineEnd = value.indexOf('\n', el.selectionEnd)
+  if (lineEnd === -1) lineEnd = value.length
+  const lines = value.slice(lineStart, lineEnd).split('\n')
+  const nextLines = lines.map(transform)
+  const block = nextLines.join('\n')
+  commitContent(value.slice(0, lineStart) + block + value.slice(lineEnd), lineStart, lineStart + block.length)
+}
+
+/** 清除行首已有的 Markdown 前缀 */
+function stripLinePrefix(line: string): string {
+  return line.replace(/^#{1,6}\s+|^>\s+|^[-*+]\s+|^\d+[.)]\s+/, '')
+}
+
+function applyCommand(cmd: ToolCommand): void {
+  if (cmd === 'preview') {
+    showPreview.value = !showPreview.value
+    if (!showPreview.value) void nextTick(autosize)
+    return
+  }
+  const el = contentEl.value
+  if (!el) return
+  const value = form.content
+  const { selectionStart: s, selectionEnd: e } = el
+
+  switch (cmd) {
+    case 'bold':
+      surroundSelection('**', '**', '加粗文字')
+      break
+    case 'italic':
+      surroundSelection('*', '*', '斜体文字')
+      break
+    case 'strike':
+      surroundSelection('~~', '~~', '删除文字')
+      break
+    case 'code': {
+      const sel = value.slice(s, e)
+      if (sel.includes('\n')) {
+        commitContent(
+          value.slice(0, s) + '```\n' + sel + '\n```' + value.slice(e),
+          s + 4,
+          s + 4 + sel.length,
+        )
+      } else {
+        surroundSelection('`', '`', 'code')
+      }
+      break
+    }
+    case 'link': {
+      const text = value.slice(s, e) || '链接文字'
+      const inserted = `[${text}](https://)`
+      commitContent(value.slice(0, s) + inserted + value.slice(e), s + text.length + 3, s + text.length + 11)
+      break
+    }
+    case 'h1':
+      transformLines((line) => {
+        const bare = stripLinePrefix(line)
+        return line.startsWith('# ') ? bare : `# ${bare}`
+      })
+      break
+    case 'h2':
+      transformLines((line) => {
+        const bare = stripLinePrefix(line)
+        return line.startsWith('## ') ? bare : `## ${bare}`
+      })
+      break
+    case 'quote':
+      transformLines((line) => (line.startsWith('> ') ? stripLinePrefix(line) : `> ${stripLinePrefix(line)}`))
+      break
+    case 'ul':
+      transformLines((line) => (line.startsWith('- ') ? stripLinePrefix(line) : `- ${stripLinePrefix(line)}`))
+      break
+    case 'ol':
+      transformLines((line, i) => (line.startsWith(`${i + 1}. `) ? stripLinePrefix(line) : `${i + 1}. ${stripLinePrefix(line)}`))
+      break
+    case 'hr': {
+      const insert = '\n\n---\n\n'
+      commitContent(value.slice(0, e) + insert + value.slice(e), e + insert.length, e + insert.length)
+      break
+    }
+  }
+}
+
 function formatDate(value: string | undefined): string {
   if (!value) return ''
   const d = new Date(value)
@@ -196,6 +328,10 @@ function formatDate(value: string | undefined): string {
     <!-- 顶栏：返回 / 笔记切换下拉 / 保存状态与操作 -->
     <header class="editor__topbar">
       <div class="editor__topbar-left">
+        <!-- 移动端菜单按钮：打开侧栏抽屉（编辑页隐藏全局 FAB，由此按钮承担） -->
+        <button v-if="isMobile" class="editor__iconbtn" title="打开菜单" @click="appStore.toggleMobile">
+          <AppIcon name="menu" :size="18" />
+        </button>
         <button class="editor__iconbtn" title="返回列表" @click="router.push('/notes')">
           <AppIcon name="chevron-left" :size="18" />
         </button>
@@ -268,9 +404,9 @@ function formatDate(value: string | undefined): string {
       <BaseButton variant="ghost" size="sm" @click="router.push('/notes')">返回列表</BaseButton>
     </div>
 
-    <article v-else class="editor__page">
-      <!-- 中间可滚动编辑区：标题 + 元信息 + 正文 -->
-      <div class="editor__scroll">
+    <template v-else>
+      <!-- 中间可滚动编辑区（grid 第二行，minmax(0,1fr) 保证它永远被约束、内部滚动）：标题 + 元信息 + 正文 -->
+      <article class="editor__main">
         <input
           v-model="form.title"
           class="editor__title"
@@ -284,25 +420,31 @@ function formatDate(value: string | undefined): string {
             <BaseTag v-for="t in current?.tags ?? []" :key="t.id" :label="t.name" :color="t.color" size="sm" />
           </div>
         </div>
+        <div class="editor__tools">
+          <EditorToolbar :previewing="showPreview" @command="applyCommand" />
+        </div>
         <textarea
+          v-show="!showPreview"
           ref="contentEl"
           v-model="form.content"
           class="editor__content"
           placeholder="开始写下你的想法…"
           @input="autosize"
         />
+        <!-- 预览：Markdown 渲染结果（已转义，防注入） -->
+        <div v-if="showPreview" class="editor__preview" v-html="previewHtml" />
         <p v-if="error" class="editor__error">{{ error }}</p>
         <p class="editor__shortcut">Ctrl / ⌘ + S 快速保存</p>
-      </div>
+      </article>
 
-      <!-- 底部固定栏：标签编辑 -->
+      <!-- 底部固定栏：标签编辑（grid 第三行，固定置底，不随内容滚动） -->
       <footer class="editor__footer">
         <div class="editor__tags-edit">
           <span class="editor__tags-label">标签</span>
           <TagSelect :tags="tags" v-model="form.tagIds" :create-tag="handleCreateTag" />
         </div>
       </footer>
-    </article>
+    </template>
 
     <!-- 删除确认弹窗 -->
     <ConfirmDialog
@@ -320,38 +462,40 @@ function formatDate(value: string | undefined): string {
 <style scoped>
 .editor {
   position: relative; /* 作为 header / footer / 滚动区的定位与层级上下文 */
-  display: flex;
-  flex-direction: column;
-  flex: 1;
+  /* 三段式：顶栏固定 + 中间可滚动 + 底栏固定。
+     minmax(0, 1fr) 是关键 —— 中间行永远被精确约束，不会随内容撑高，
+     内部 content 超出时由 .editor__main 自行滚动（滚轮/触控板/方向键均可）。 */
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100vh;
+  height: 100dvh;
   min-height: 0;
 }
 
-/* 顶栏：固定置顶，层级最高，不随编辑区滚动 */
+/* 顶栏：固定置顶，层级最高，不随编辑区滚动（grid 第一行，背景不透明） */
 .editor__topbar {
-  position: sticky;
-  top: 0;
   z-index: 20;
-  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-6);
-  background: color-mix(in srgb, var(--bg-card) 92%, transparent);
-  backdrop-filter: blur(10px);
+  background: var(--bg-card);
   border-bottom: 1px solid var(--border-default);
-  flex-wrap: wrap;
+  flex-wrap: nowrap; /* 任何屏宽都保持单行，防止操作区换行撑高顶栏 */
 }
 .editor__topbar-left {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  flex: 1; /* 占据剩余空间，标题过长时收缩省略 */
   min-width: 0;
 }
 .editor__topbar-right {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  flex-shrink: 0;
 }
 .editor__iconbtn {
   display: inline-flex;
@@ -500,35 +644,23 @@ function formatDate(value: string | undefined): string {
   color: var(--text-muted);
 }
 
-/* 页面：铺满内容区（侧栏以外的全部宽度/高度），列为「可滚动中间区 + 固定底部栏」 */
-.editor__page {
+/* 中间可滚动编辑区：grid 第二行（minmax(0,1fr)），标题 + 元信息 + 正文均可滚动浏览 */
+.editor__main {
   position: relative;
   z-index: 1;
   width: 100%;
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-/* 中间编辑区：标题 + 元信息 + 正文，可独立滚动（层级最低，位于两层固定栏之下） */
-.editor__scroll {
-  position: relative;
-  z-index: 1;
-  flex: 1;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: var(--space-8) clamp(16px, 6vw, 64px) var(--space-6);
+  padding: var(--space-8) clamp(16px, 6vw, 64px) var(--space-10);
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
 }
-/* 底部固定栏：标签编辑，固定置底，层级高于滚动区，不随内容滚动 */
+/* 底部固定栏：标签编辑，固定置底（grid 第三行），层级高于滚动区，不随内容滚动 */
 .editor__footer {
   position: relative;
   z-index: 10;
-  flex-shrink: 0;
   border-top: 1px solid var(--border-default);
   background: var(--bg-card);
   box-shadow: 0 -4px 12px color-mix(in srgb, var(--bg-primary) 40%, transparent);
@@ -564,6 +696,79 @@ function formatDate(value: string | undefined): string {
   flex-wrap: wrap;
   gap: 6px;
 }
+/* 工具栏：随内容一起滚动，移动端可横向滑动 */
+.editor__tools {
+  flex-shrink: 0;
+}
+/* 预览排版：与正文一致的阅读节奏 */
+.editor__preview {
+  width: 100%;
+  min-height: 160px;
+  font-size: 15px;
+  line-height: 1.9;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+.editor__preview :deep(h1) {
+  font-size: 1.6em;
+  font-weight: 700;
+  margin: 0.8em 0 0.4em;
+}
+.editor__preview :deep(h2) {
+  font-size: 1.35em;
+  font-weight: 700;
+  margin: 0.8em 0 0.4em;
+}
+.editor__preview :deep(h3),
+.editor__preview :deep(h4) {
+  font-size: 1.15em;
+  font-weight: 600;
+  margin: 0.7em 0 0.3em;
+}
+.editor__preview :deep(p) {
+  margin: 0 0 0.6em;
+}
+.editor__preview :deep(ul),
+.editor__preview :deep(ol) {
+  margin: 0 0 0.6em;
+  padding-left: 1.6em;
+}
+.editor__preview :deep(blockquote) {
+  margin: 0 0 0.6em;
+  padding: 2px 0 2px 14px;
+  border-left: 3px solid var(--accent-primary);
+  color: var(--text-secondary);
+}
+.editor__preview :deep(code) {
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.9em;
+}
+.editor__preview :deep(pre) {
+  margin: 0 0 0.6em;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  overflow-x: auto;
+}
+.editor__preview :deep(pre code) {
+  padding: 0;
+  background: transparent;
+}
+.editor__preview :deep(a) {
+  color: var(--accent-primary);
+}
+.editor__preview :deep(hr) {
+  margin: 1em 0;
+  border: none;
+  border-top: 1px solid var(--border-default);
+}
+.editor__preview :deep(img) {
+  max-width: 100%;
+  border-radius: var(--radius-md);
+}
 /* 自适应高度：无固定高度、禁用 resize，由 JS 按 scrollHeight 撑开，中间区可滚动 */
 .editor__content {
   width: 100%;
@@ -588,6 +793,11 @@ function formatDate(value: string | undefined): string {
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);
+  flex-wrap: wrap; /* 窄屏时标签整体可换行，避免溢出 */
+  width: 100%;
+}
+.editor__tags-edit :deep(.tag-select) {
+  flex-wrap: wrap; /* 标签多时在底栏内换行 */
 }
 .editor__tags-label {
   font-size: 13px;
@@ -624,20 +834,70 @@ function formatDate(value: string | undefined): string {
   transform: translateY(-6px);
 }
 
-/* 移动端适配 */
+/* 中小屏适配（≤640px）：顶栏/底栏单行紧凑，去除多余上下空间 */
 @media (max-width: 640px) {
+  /* 全局浮动汉堡按钮在编辑页已隐藏，菜单入口在顶栏内，无需再避让 */
   .editor__topbar {
-    padding: var(--space-3) var(--space-4);
-    padding-left: 72px; /* 避开移动端浮动菜单按钮 */
+    padding: 6px 10px;
+    gap: 6px;
   }
-  .editor__scroll {
-    padding: var(--space-5) var(--space-4) var(--space-6);
+  .editor__topbar-left {
+    gap: 2px;
+  }
+  .editor__topbar-right {
+    gap: 2px;
+  }
+  .editor__iconbtn {
+    width: 32px;
+    height: 32px;
+  }
+  .editor__state {
+    display: none; /* 窄屏隐藏状态文字，由保存按钮 loading 表达 */
+  }
+  .switcher {
+    flex: 1;
+    min-width: 0;
+  }
+  .switcher__trigger {
+    max-width: none;
+    width: 100%;
+    padding: 6px 8px;
+  }
+  .editor__main {
+    padding: 12px 14px 20px;
+  }
+  .editor__title {
+    font-size: 24px; /* 小屏固定标题字号，避免 clamp 过大 */
+  }
+  .editor__content,
+  .editor__preview {
+    font-size: 16px; /* ≥16px 防止 iOS 聚焦自动放大 */
+  }
+  .editor__shortcut {
+    display: none; /* 移动端无键盘快捷键意义 */
   }
   .editor__footer {
-    padding: var(--space-3) var(--space-4);
+    padding: 8px 12px;
+    padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  }
+  .editor__tags-label {
+    padding-top: 4px;
   }
   .switcher__menu {
     width: min(280px, 76vw);
+  }
+}
+
+/* 平板适配（641–1024px）：收紧上下留白 */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .editor__topbar {
+    padding: 8px 16px;
+  }
+  .editor__main {
+    padding: 20px 24px 28px;
+  }
+  .editor__footer {
+    padding: 8px 16px;
   }
 }
 </style>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useAppStore } from '@/stores/app.store'
@@ -10,6 +11,9 @@ const app = useAppStore()
 const route = useRoute()
 
 const { isMobile, mobileOpen, sidebarCollapsed } = storeToRefs(app)
+
+// 全幅页面（笔记编辑器）自带顶栏与菜单入口，隐藏全局浮动按钮避免重叠
+const fullBleed = computed(() => route.meta.fullBleed === true)
 
 interface NavItem {
   to: string
@@ -24,9 +28,9 @@ const navItems: NavItem[] = [
 </script>
 
 <template>
-  <!-- 移动端浮动汉堡按钮 -->
+  <!-- 移动端浮动汉堡按钮（编辑器等全幅页面隐藏，由页面自带菜单按钮承担） -->
   <button
-    v-if="isMobile"
+    v-if="isMobile && !fullBleed"
     class="sidebar-fab"
     :class="{ 'is-hidden': mobileOpen }"
     aria-label="打开菜单"

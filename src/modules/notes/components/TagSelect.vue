@@ -23,6 +23,7 @@ function toggle(id: number): void {
 const creating = ref(false)
 const newName = ref('')
 const creatingError = ref('')
+const submitting = ref(false)
 const inputEl = ref<HTMLInputElement | null>(null)
 
 async function startCreate(): Promise<void> {
@@ -33,6 +34,9 @@ async function startCreate(): Promise<void> {
 }
 
 async function confirmCreate(): Promise<void> {
+  // 输入框在成功/取消后被移出 DOM，移除动作会触发一次 blur；
+  // 此二次进入必须忽略，否则会把成功后的状态误判为“请输入标签名”。
+  if (!creating.value || submitting.value) return
   const name = newName.value.trim()
   if (!name) {
     creatingError.value = '请输入标签名'
@@ -46,7 +50,9 @@ async function confirmCreate(): Promise<void> {
     creating.value = false
     return
   }
+  submitting.value = true
   const tag = await props.createTag(name)
+  submitting.value = false
   if (!tag) {
     creatingError.value = '创建失败，请重试'
     return
@@ -86,6 +92,7 @@ function cancelCreate(): void {
         type="text"
         maxlength="50"
         placeholder="标签名，回车确认"
+        @input="creatingError = ''"
         @keyup.enter="confirmCreate"
         @keyup.esc="cancelCreate"
         @blur="confirmCreate"

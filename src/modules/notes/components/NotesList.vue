@@ -8,6 +8,7 @@ import BaseTag from '@/components/common/BaseTag.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import EmptyState from '@/components/feedback/EmptyState.vue'
 import SkeletonCard from '@/components/feedback/SkeletonCard.vue'
+import { parseImportedFile } from '../utils/importNotes'
 import { useToast } from '@/composables/useToast'
 
 const store = useNotesStore()
@@ -44,6 +45,45 @@ async function onDelete(): Promise<void> {
   else toast.error(error.value || '删除失败，请重试')
 }
 
+// —— 本地笔记导入：txt / md / html，自动做格式转换 ——
+const fileInput = ref<HTMLInputElement | null>(null)
+const importing = ref(false)
+
+function pickFiles(): void {
+  fileInput.value?.click()
+}
+
+async function onFilesChosen(e: Event): Promise<void> {
+  const input = e.target as HTMLInputElement
+  const files = Array.from(input.files ?? [])
+  input.value = '' // 允许重复选择同一文件
+  if (!files.length || importing.value) return
+
+  importing.value = true
+  let ok = 0
+  const failures: string[] = []
+  for (const file of files) {
+    try {
+      const note = await parseImportedFile(file)
+      const created = await store.submitCreate({
+        title: note.title,
+        content: note.content,
+        isPinned: false,
+        tagIds: [],
+      })
+      if (created) ok += 1
+      else failures.push(file.name)
+    } catch (err) {
+      failures.push(err instanceof Error ? err.message : file.name)
+    }
+  }
+  importing.value = false
+
+  if (ok && failures.length) toast.success(`已导入 ${ok} 篇，${failures.length} 篇失败`)
+  else if (ok) toast.success(`已导入 ${ok} 篇笔记`)
+  else toast.error(failures[0] || '没有可导入的笔记')
+}
+
 function excerpt(content: string): string {
   return content.replace(/\s+/g, ' ').trim().slice(0, 140) || '（空白笔记）'
 }
@@ -62,10 +102,30 @@ function formatDate(value: string): string {
         <h1 class="notes__title">我的笔记</h1>
         <p class="notes__sub">共 {{ total }} 篇</p>
       </div>
-      <button class="notes__create" @click="openCreate">
-        <AppIcon name="plus" :size="16" />
-        <span>新建笔记</span>
-      </button>
+      <div class="notes__actions">
+        <button
+          class="notes__import"
+          :disabled="importing"
+          title="导入本地笔记（.txt / .md / .html）"
+          @click="pickFiles"
+        >
+          <AppIcon name="upload" :size="16" />
+          <span>{{ importing ? '导入中…' : '导入' }}</span>
+        </button>
+        <button class="notes__create" @click="openCreate">
+          <AppIcon name="plus" :size="16" />
+          <span>新建笔记</span>
+        </button>
+      </div>
+      <!-- 隐藏文件选择框：普通文本 / Markdown / 有格式 HTML 笔记 -->
+      <input
+        ref="fileInput"
+        type="file"
+        accept=".txt,.text,.md,.markdown,.html,.htm"
+        multiple
+        hidden
+        @change="onFilesChosen"
+      />
     </header>
 
     <div class="notes__tools">
@@ -180,6 +240,33 @@ function formatDate(value: string): string {
   font-size: 13px;
   color: var(--text-muted);
   margin-top: 2px;
+}
+.notes__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+.notes__import {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 14px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-standard);
+}
+.notes__import:hover:not(:disabled) {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+.notes__import:disabled {
+  opacity: 0.6;
+  cursor: wait;
 }
 .notes__create {
   display: inline-flex;
