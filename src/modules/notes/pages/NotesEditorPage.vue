@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useNotesStore } from '../stores/notes.store'
-import type { NoteCreatePayload } from '../types/notes.types'
+import type { NoteCreatePayload, Tag } from '../types/notes.types'
 import AppIcon from '@/components/common/AppIcon.vue'
 import BaseButton from '@/components/common/BaseButton.vue'
 import BaseTag from '@/components/common/BaseTag.vue'
@@ -22,9 +22,19 @@ const noteId = computed<number | null>(() => {
 const isEdit = computed(() => noteId.value !== null)
 
 const form = reactive({ title: '', content: '', isPinned: false, tagIds: [] as number[] })
-let snapshot = ''
 
-const dirty = computed(() => JSON.stringify({ ...form }) !== snapshot)
+// 快照必须是响应式 ref：保存成功后仅快照变化、form 不变时，
+// dirty 计算属性才会重新求值（普通变量不会触发，导致“未保存”不消失、按钮仍可点击）。
+const snapshot = ref('')
+
+const dirty = computed(() => JSON.stringify({ ...form }) !== snapshot.value)
+
+/** 保存状态文案：保存中 / 未保存 / 已保存 */
+const saveState = computed(() => (saving.value ? '保存中…' : dirty.value ? '未保存' : '已保存'))
+
+function takeSnapshot(): void {
+  snapshot.value = JSON.stringify({ ...form })
+}
 
 function fillFromNote(note: {
   title: string
@@ -37,10 +47,7 @@ function fillFromNote(note: {
   form.isPinned = note.isPinned
   form.tagIds = note.tags.map((t) => t.id)
   takeSnapshot()
-}
-
-function takeSnapshot(): void {
-  snapshot = JSON.stringify({ ...form })
+  void nextTick(autosize)
 }
 
 function resetForm(): void {
@@ -65,8 +72,9 @@ async function loadTarget(): Promise<void> {
 }
 
 onMounted(() => {
-  // 笔记切换下拉需要列表数据
+  // 笔记切换下拉与标签选择器都需要基础数据
   if (!store.notes.length) void store.loadNotes()
+  if (!store.tags.length) void store.loadTags()
   void loadTarget()
 })
 
@@ -74,6 +82,7 @@ onMounted(() => {
 watch(noteId, () => void loadTarget())
 
 async function onSave(): Promise<void> {
+  if (saving.value) return
   if (!form.title.trim()) {
     store.error = '请填写标题'
     return
@@ -114,6 +123,14 @@ function togglePinLocal(): void {
   form.isPinned = !form.isPinned
 }
 
+/** 内联新建标签，成功后由 TagSelect 自动勾选 */
+async function handleCreateTag(name: string): Promise<Tag | null> {
+  return store.addTag(name)
+}
+
+// —— 笔记切换下拉 ——
+const menuOpen = ref(false)
+
 function switchTo(id: number): void {
   menuOpen.value = false
   if (id !== noteId.value) void router.push(`/notes/${id}/edit`)
@@ -121,15 +138,27 @@ function switchTo(id: number): void {
 
 function goCreate(): void {
   menuOpen.value = false
-  if (!isEdit.value) {
-    menuOpen.value = false
-    return
-  }
+  if (!isEdit.value) return
   void router.push('/notes/new')
 }
 
-// 笔记切换下拉
-const menuOpen = ref(false)
+// —— 内容自适应高度：textarea 不出现自身滚动条，整页滚动浏览 ——
+const contentEl = ref<HTMLTextAreaElement | null>(null)
+
+function autosize(): void {
+  const el = contentEl.value
+  if (!el) return
+  el.style.height = 'auto'
+  el.style.height = `${el.scrollHeight}px`
+}
+
+watch(
+  () => form.content,
+  () => void nextTick(autosize),
+)
+watch(currentLoading, (v) => {
+  if (!v) void nextTick(autosize)
+})
 
 function formatDate(value: string | undefined): string {
   if (!value) return ''
@@ -142,7 +171,7 @@ function formatDate(value: string | undefined): string {
 
 <template>
   <div class="editor" @keydown="onKeydown">
-    <!-- 顶栏：返回 / 笔记切换下拉 / 操作 -->
+    <!-- 顶栏：返回 / 笔记切换下拉 / 保存状态与操作 -->
     <header class="editor__topbar">
       <div class="editor__topbar-left">
         <button class="editor__iconbtn" title="返回列表" @click="router.push('/notes')">
@@ -182,7 +211,10 @@ function formatDate(value: string | undefined): string {
       </div>
 
       <div class="editor__topbar-right">
-        <span v-if="dirty" class="editor__dirty">未保存</span>
+        <span class="editor__state" :class="{ 'is-dirty': dirty && !saving, 'is-saved': !dirty && !saving }">
+          <AppIcon v-if="!dirty && !saving" name="check" :size="13" />
+          {{ saveState }}
+        </span>
         <button
           v-if="isEdit"
           class="editor__iconbtn"
@@ -195,47 +227,53 @@ function formatDate(value: string | undefined): string {
         <button v-if="isEdit" class="editor__iconbtn editor__iconbtn--danger" title="删除笔记" @click="onDelete">
           <AppIcon name="trash" :size="17" />
         </button>
-        <BaseButton variant="primary" size="sm" :loading="saving" :disabled="isEdit && !dirty" @click="onSave">
+        <BaseButton
+          variant="primary"
+          size="sm"
+          :loading="saving"
+          :disabled="saving || (isEdit && !dirty)"
+          @click="onSave"
+        >
           保存
         </BaseButton>
       </div>
     </header>
 
-    <!-- 正文：居中单栏，Notion 风格 -->
-    <div class="editor__scroll">
-      <div v-if="currentLoading" class="editor__state">加载中…</div>
-      <div v-else-if="isEdit && !current" class="editor__state">
-        <p>{{ error || '笔记不存在' }}</p>
-        <BaseButton variant="ghost" size="sm" @click="router.push('/notes')">返回列表</BaseButton>
-      </div>
-
-      <article v-else class="editor__page">
-        <input
-          v-model="form.title"
-          class="editor__title"
-          type="text"
-          placeholder="无标题"
-          autocomplete="off"
-        />
-        <div class="editor__meta">
-          <span v-if="current" class="editor__meta-time">更新于 {{ formatDate(current.updatedAt) }}</span>
-          <div class="editor__meta-tags">
-            <BaseTag v-for="t in current?.tags ?? []" :key="t.id" :label="t.name" :color="t.color" size="sm" />
-          </div>
-        </div>
-        <textarea
-          v-model="form.content"
-          class="editor__content"
-          placeholder="开始写下你的想法…"
-        />
-        <div class="editor__tags-edit">
-          <span class="editor__tags-label">标签</span>
-          <TagSelect :tags="tags" v-model="form.tagIds" />
-        </div>
-        <p v-if="error" class="editor__error">{{ error }}</p>
-        <p class="editor__shortcut">Ctrl / ⌘ + S 快速保存</p>
-      </article>
+    <!-- 正文：整页滚动，textarea 自适应高度，无内部滚动区域 -->
+    <div v-if="currentLoading" class="editor__state-page">加载中…</div>
+    <div v-else-if="isEdit && !current" class="editor__state-page">
+      <p>{{ error || '笔记不存在' }}</p>
+      <BaseButton variant="ghost" size="sm" @click="router.push('/notes')">返回列表</BaseButton>
     </div>
+
+    <article v-else class="editor__page">
+      <input
+        v-model="form.title"
+        class="editor__title"
+        type="text"
+        placeholder="无标题"
+        autocomplete="off"
+      />
+      <div class="editor__meta">
+        <span v-if="current" class="editor__meta-time">更新于 {{ formatDate(current.updatedAt) }}</span>
+        <div class="editor__meta-tags">
+          <BaseTag v-for="t in current?.tags ?? []" :key="t.id" :label="t.name" :color="t.color" size="sm" />
+        </div>
+      </div>
+      <textarea
+        ref="contentEl"
+        v-model="form.content"
+        class="editor__content"
+        placeholder="开始写下你的想法…"
+        @input="autosize"
+      />
+      <div class="editor__tags-edit">
+        <span class="editor__tags-label">标签</span>
+        <TagSelect :tags="tags" v-model="form.tagIds" :create-tag="handleCreateTag" />
+      </div>
+      <p v-if="error" class="editor__error">{{ error }}</p>
+      <p class="editor__shortcut">Ctrl / ⌘ + S 快速保存</p>
+    </article>
   </div>
 </template>
 
@@ -243,14 +281,21 @@ function formatDate(value: string | undefined): string {
 .editor {
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - 120px);
+  min-height: 100%;
 }
+
+/* 顶栏：占满内容区宽度，滚动时吸顶 */
 .editor__topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  padding-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-6);
+  background: color-mix(in srgb, var(--bg-card) 88%, transparent);
+  backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border-default);
   flex-wrap: wrap;
 }
@@ -293,9 +338,20 @@ function formatDate(value: string | undefined): string {
   height: 20px;
   background: var(--border-default);
 }
-.editor__dirty {
+
+/* 保存状态：未保存（主色）/ 保存中（次级）/ 已保存（对勾） */
+.editor__state {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 12px;
+  color: var(--text-muted);
+}
+.editor__state.is-dirty {
   color: var(--accent-primary);
+}
+.editor__state.is-saved {
+  color: var(--success, #4cae8f);
 }
 
 /* 笔记切换下拉 */
@@ -401,15 +457,12 @@ function formatDate(value: string | undefined): string {
   color: var(--text-muted);
 }
 
-/* 正文 */
-.editor__scroll {
-  flex: 1;
-  overflow-y: auto;
-}
+/* 正文：居中单栏，整页滚动 */
 .editor__page {
-  max-width: 760px;
+  width: 100%;
+  max-width: 820px;
   margin: 0 auto;
-  padding: var(--space-8) var(--space-4) var(--space-10);
+  padding: var(--space-8) var(--space-6) var(--space-10);
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
@@ -444,10 +497,13 @@ function formatDate(value: string | undefined): string {
   flex-wrap: wrap;
   gap: 6px;
 }
+/* 自适应高度：无固定高度、禁用 resize，由 JS 按 scrollHeight 撑开，整页滚动 */
 .editor__content {
   width: 100%;
-  min-height: 46vh;
-  resize: vertical;
+  height: auto;
+  min-height: 160px;
+  overflow: hidden;
+  resize: none;
   border: none;
   outline: none;
   background: transparent;
@@ -482,7 +538,7 @@ function formatDate(value: string | undefined): string {
   font-size: 12px;
   color: var(--text-muted);
 }
-.editor__state {
+.editor__state-page {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -505,11 +561,12 @@ function formatDate(value: string | undefined): string {
 
 /* 移动端适配 */
 @media (max-width: 640px) {
-  .editor__page {
-    padding: var(--space-5) var(--space-1) var(--space-8);
+  .editor__topbar {
+    padding: var(--space-3) var(--space-4);
+    padding-left: 72px; /* 避开移动端浮动菜单按钮 */
   }
-  .editor__content {
-    min-height: 38vh;
+  .editor__page {
+    padding: var(--space-5) var(--space-4) var(--space-8);
   }
   .switcher__menu {
     width: min(280px, 76vw);

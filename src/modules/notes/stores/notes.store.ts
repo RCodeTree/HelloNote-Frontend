@@ -31,6 +31,20 @@ export const useNotesStore = defineStore('notes', () => {
     }
   }
 
+  /** 新建标签，成功返回新标签（已按名称排序插入列表） */
+  async function addTag(name: string): Promise<Tag | null> {
+    const trimmed = name.trim()
+    if (!trimmed) return null
+    try {
+      const tag = await notesApi.createTag(trimmed)
+      tags.value = [...tags.value, tag].sort((a, b) => a.name.localeCompare(b.name, 'zh'))
+      return tag
+    } catch (e: any) {
+      error.value = e?.response?.data?.detail || '创建标签失败'
+      return null
+    }
+  }
+
   async function loadNotes(): Promise<void> {
     loading.value = true
     error.value = null
@@ -158,6 +172,8 @@ export const useNotesStore = defineStore('notes', () => {
     saving,
     init,
     loadNotes,
+    loadTags,
+    addTag,
     loadNote,
     clearCurrent,
     setSearch,

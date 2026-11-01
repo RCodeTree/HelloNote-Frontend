@@ -1,10 +1,18 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 import type { NoteSummary } from '@/modules/dashboard/types/dashboard.types'
 import BaseTag from '@/components/common/BaseTag.vue'
 import AppIcon from '@/components/common/AppIcon.vue'
 
 const props = defineProps<{ note: NoteSummary }>()
+
+const router = useRouter()
+
+// 点击卡片直达笔记编辑页
+function openEditor(): void {
+  void router.push(`/notes/${props.note.id}/edit`)
+}
 
 function formatDate(value: string): string {
   const d = new Date(value)
@@ -20,7 +28,7 @@ const dateLabel = computed(() => formatDate(props.note.updatedAt))
 </script>
 
 <template>
-  <article class="note-card">
+  <article class="note-card" role="button" tabindex="0" @click="openEditor" @keydown.enter="openEditor">
     <div class="note-card__top">
       <h3 class="note-card__title">{{ note.title }}</h3>
       <AppIcon v-if="note.isPinned" name="pin" :size="15" class="note-card__pin" />
@@ -51,10 +59,16 @@ const dateLabel = computed(() => formatDate(props.note.updatedAt))
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  transition: border-color var(--duration-fast) var(--ease-standard);
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
 }
 .note-card:hover {
   border-color: var(--accent-primary);
+  transform: translateY(-1px);
+}
+.note-card:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
 }
 .note-card__top {
   display: flex;

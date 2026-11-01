@@ -141,9 +141,11 @@ function handleLogout(): void {
 .sidebar-user__menu {
   position: absolute;
   left: 8px;
-  right: 8px;
   bottom: calc(100% + 8px);
   z-index: 75;
+  /* 固定最小宽度：侧栏收起（76px）时菜单也能完整显示文字而不换行 */
+  width: 200px;
+  max-width: calc(100vw - 24px);
   display: flex;
   flex-direction: column;
   gap: 2px;

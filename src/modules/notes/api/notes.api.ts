@@ -92,3 +92,9 @@ export async function fetchTags(): Promise<Tag[]> {
   const { data } = await http.get<RawTag[]>('/tags')
   return data.map((t) => ({ id: t.id, name: t.name, color: t.color }))
 }
+
+// 新建标签（编辑器内联创建用）
+export async function createTag(name: string): Promise<Tag> {
+  const { data } = await http.post<RawTag>('/tags', { name })
+  return { id: data.id, name: data.name, color: data.color }
+}
