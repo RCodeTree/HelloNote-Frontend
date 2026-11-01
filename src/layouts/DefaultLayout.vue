@@ -12,7 +12,7 @@ const fullBleed = computed(() => route.meta.fullBleed === true)
 </script>
 
 <template>
-  <div class="app-shell">
+  <div class="app-shell" :class="{ 'app-shell--full': fullBleed }">
     <AppSidebar />
     <div class="app-shell__main">
       <div class="app-shell__topbar">
@@ -34,6 +34,7 @@ const fullBleed = computed(() => route.meta.fullBleed === true)
 .app-shell__main {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
@@ -58,10 +59,24 @@ const fullBleed = computed(() => route.meta.fullBleed === true)
   display: flex;
   flex-direction: column;
   flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 .app-shell__content--full :deep(> *) {
   flex: 1;
   min-height: 0;
+}
+/* 全幅编辑器：把布局壳高度锁死到视口，仅由页面内部的中间区滚动。
+   若仅用 min-height:100vh，内容变长时整个壳会无限撑高，滚动会落到窗口/textarea
+   而非编辑器中间区，header/footer 也随之滚走。 */
+.app-shell--full {
+  height: 100vh;
+  height: 100dvh;
+  min-height: 100vh;
+  overflow: hidden;
+}
+.app-shell--full .app-shell__topbar {
+  display: none; /* 编辑器自带顶栏，隐藏空壳顶栏 */
 }
 @media (max-width: 640px) {
   .app-shell__topbar {

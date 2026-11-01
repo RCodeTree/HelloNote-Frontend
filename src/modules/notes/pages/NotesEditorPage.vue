@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useNotesStore } from '../stores/notes.store'
@@ -7,11 +7,14 @@ import type { NoteCreatePayload, Tag } from '../types/notes.types'
 import AppIcon from '@/components/common/AppIcon.vue'
 import BaseButton from '@/components/common/BaseButton.vue'
 import BaseTag from '@/components/common/BaseTag.vue'
+import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import TagSelect from '../components/TagSelect.vue'
+import { useToast } from '@/composables/useToast'
 
 const route = useRoute()
 const router = useRouter()
 const store = useNotesStore()
+const toast = useToast()
 const { notes, tags, current, currentLoading, saving, error } = storeToRefs(store)
 
 const noteId = computed<number | null>(() => {
@@ -76,6 +79,12 @@ onMounted(() => {
   if (!store.notes.length) void store.loadNotes()
   if (!store.tags.length) void store.loadTags()
   void loadTarget()
+  // 视口宽度变化会改变换行，需重算 textarea 高度
+  window.addEventListener('resize', autosize)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', autosize)
 })
 
 // 路由参数变化（下拉切换笔记）时重新加载
@@ -112,11 +121,24 @@ function onKeydown(e: KeyboardEvent): void {
   }
 }
 
+// —— 删除：应用内确认弹窗替代原生 confirm，删除成功后 toast 提示 ——
+const deleteOpen = ref(false)
+
+function requestDelete(): void {
+  if (noteId.value === null) return
+  deleteOpen.value = true
+}
+
 async function onDelete(): Promise<void> {
   if (noteId.value === null) return
-  if (!window.confirm('确定删除这篇笔记吗？删除后不可恢复。')) return
+  deleteOpen.value = false
   const ok = await store.remove(noteId.value)
-  if (ok) await router.push('/notes')
+  if (ok) {
+    toast.success('笔记已删除')
+    await router.push('/notes')
+  } else {
+    toast.error(error.value || '删除失败，请重试')
+  }
 }
 
 function togglePinLocal(): void {
@@ -224,7 +246,7 @@ function formatDate(value: string | undefined): string {
         >
           <AppIcon name="pin" :size="17" />
         </button>
-        <button v-if="isEdit" class="editor__iconbtn editor__iconbtn--danger" title="删除笔记" @click="onDelete">
+        <button v-if="isEdit" class="editor__iconbtn editor__iconbtn--danger" title="删除笔记" @click="requestDelete">
           <AppIcon name="trash" :size="17" />
         </button>
         <BaseButton
@@ -247,54 +269,75 @@ function formatDate(value: string | undefined): string {
     </div>
 
     <article v-else class="editor__page">
-      <input
-        v-model="form.title"
-        class="editor__title"
-        type="text"
-        placeholder="无标题"
-        autocomplete="off"
-      />
-      <div class="editor__meta">
-        <span v-if="current" class="editor__meta-time">更新于 {{ formatDate(current.updatedAt) }}</span>
-        <div class="editor__meta-tags">
-          <BaseTag v-for="t in current?.tags ?? []" :key="t.id" :label="t.name" :color="t.color" size="sm" />
+      <!-- 中间可滚动编辑区：标题 + 元信息 + 正文 -->
+      <div class="editor__scroll">
+        <input
+          v-model="form.title"
+          class="editor__title"
+          type="text"
+          placeholder="无标题"
+          autocomplete="off"
+        />
+        <div class="editor__meta">
+          <span v-if="current" class="editor__meta-time">更新于 {{ formatDate(current.updatedAt) }}</span>
+          <div class="editor__meta-tags">
+            <BaseTag v-for="t in current?.tags ?? []" :key="t.id" :label="t.name" :color="t.color" size="sm" />
+          </div>
         </div>
+        <textarea
+          ref="contentEl"
+          v-model="form.content"
+          class="editor__content"
+          placeholder="开始写下你的想法…"
+          @input="autosize"
+        />
+        <p v-if="error" class="editor__error">{{ error }}</p>
+        <p class="editor__shortcut">Ctrl / ⌘ + S 快速保存</p>
       </div>
-      <textarea
-        ref="contentEl"
-        v-model="form.content"
-        class="editor__content"
-        placeholder="开始写下你的想法…"
-        @input="autosize"
-      />
-      <div class="editor__tags-edit">
-        <span class="editor__tags-label">标签</span>
-        <TagSelect :tags="tags" v-model="form.tagIds" :create-tag="handleCreateTag" />
-      </div>
-      <p v-if="error" class="editor__error">{{ error }}</p>
-      <p class="editor__shortcut">Ctrl / ⌘ + S 快速保存</p>
+
+      <!-- 底部固定栏：标签编辑 -->
+      <footer class="editor__footer">
+        <div class="editor__tags-edit">
+          <span class="editor__tags-label">标签</span>
+          <TagSelect :tags="tags" v-model="form.tagIds" :create-tag="handleCreateTag" />
+        </div>
+      </footer>
     </article>
+
+    <!-- 删除确认弹窗 -->
+    <ConfirmDialog
+      :open="deleteOpen"
+      title="删除笔记"
+      message="确定要删除这篇笔记吗？删除后不可恢复。"
+      confirm-text="删除"
+      danger
+      @confirm="onDelete"
+      @cancel="deleteOpen = false"
+    />
   </div>
 </template>
 
 <style scoped>
 .editor {
+  position: relative; /* 作为 header / footer / 滚动区的定位与层级上下文 */
   display: flex;
   flex-direction: column;
-  min-height: 100%;
+  flex: 1;
+  min-height: 0;
 }
 
-/* 顶栏：占满内容区宽度，滚动时吸顶 */
+/* 顶栏：固定置顶，层级最高，不随编辑区滚动 */
 .editor__topbar {
   position: sticky;
   top: 0;
   z-index: 20;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-6);
-  background: color-mix(in srgb, var(--bg-card) 88%, transparent);
+  background: color-mix(in srgb, var(--bg-card) 92%, transparent);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border-default);
   flex-wrap: wrap;
@@ -457,15 +500,39 @@ function formatDate(value: string | undefined): string {
   color: var(--text-muted);
 }
 
-/* 正文：居中单栏，整页滚动 */
+/* 页面：铺满内容区（侧栏以外的全部宽度/高度），列为「可滚动中间区 + 固定底部栏」 */
 .editor__page {
+  position: relative;
+  z-index: 1;
   width: 100%;
-  max-width: 820px;
-  margin: 0 auto;
-  padding: var(--space-8) var(--space-6) var(--space-10);
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* 中间编辑区：标题 + 元信息 + 正文，可独立滚动（层级最低，位于两层固定栏之下） */
+.editor__scroll {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-8) clamp(16px, 6vw, 64px) var(--space-6);
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+}
+/* 底部固定栏：标签编辑，固定置底，层级高于滚动区，不随内容滚动 */
+.editor__footer {
+  position: relative;
+  z-index: 10;
+  flex-shrink: 0;
+  border-top: 1px solid var(--border-default);
+  background: var(--bg-card);
+  box-shadow: 0 -4px 12px color-mix(in srgb, var(--bg-primary) 40%, transparent);
+  padding: var(--space-3) clamp(16px, 6vw, 64px);
 }
 .editor__title {
   width: 100%;
@@ -497,7 +564,7 @@ function formatDate(value: string | undefined): string {
   flex-wrap: wrap;
   gap: 6px;
 }
-/* 自适应高度：无固定高度、禁用 resize，由 JS 按 scrollHeight 撑开，整页滚动 */
+/* 自适应高度：无固定高度、禁用 resize，由 JS 按 scrollHeight 撑开，中间区可滚动 */
 .editor__content {
   width: 100%;
   height: auto;
@@ -521,8 +588,6 @@ function formatDate(value: string | undefined): string {
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--border-default);
 }
 .editor__tags-label {
   font-size: 13px;
@@ -565,8 +630,11 @@ function formatDate(value: string | undefined): string {
     padding: var(--space-3) var(--space-4);
     padding-left: 72px; /* 避开移动端浮动菜单按钮 */
   }
-  .editor__page {
-    padding: var(--space-5) var(--space-4) var(--space-8);
+  .editor__scroll {
+    padding: var(--space-5) var(--space-4) var(--space-6);
+  }
+  .editor__footer {
+    padding: var(--space-3) var(--space-4);
   }
   .switcher__menu {
     width: min(280px, 76vw);

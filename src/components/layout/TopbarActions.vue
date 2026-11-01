@@ -1,12 +1,10 @@
 <script setup lang="ts">
-// 顶栏只保留主题切换；登录态/用户信息已移至侧栏底部（SidebarUser）。
-import ThemeSwitcher from '@/components/feedback/ThemeSwitcher.vue'
+// 主题切换已集成到侧栏底部「用户」菜单中（SidebarUser）。
+// 此处保留空占位，仅用于维持布局壳顶栏的间距与结构。
 </script>
 
 <template>
-  <div class="topbar-actions">
-    <ThemeSwitcher />
-  </div>
+  <div class="topbar-actions" />
 </template>
 
 <style scoped>

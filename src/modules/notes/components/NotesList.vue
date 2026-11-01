@@ -1,15 +1,18 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useNotesStore } from '../stores/notes.store'
 import AppIcon from '@/components/common/AppIcon.vue'
 import BaseTag from '@/components/common/BaseTag.vue'
+import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import EmptyState from '@/components/feedback/EmptyState.vue'
 import SkeletonCard from '@/components/feedback/SkeletonCard.vue'
+import { useToast } from '@/composables/useToast'
 
 const store = useNotesStore()
 const router = useRouter()
+const toast = useToast()
 const { notes, loading, error, search, selectedTagId, tags, total } = storeToRefs(store)
 
 onMounted(() => {
@@ -24,9 +27,21 @@ function openCreate(): void {
   void router.push('/notes/new')
 }
 
-async function onDelete(id: number): Promise<void> {
-  if (!window.confirm('确定删除这篇笔记吗？删除后不可恢复。')) return
-  await store.remove(id)
+// —— 删除：应用内确认弹窗替代原生 confirm，成功后 toast 提示 ——
+const deleteTarget = ref<number | null>(null)
+const deleteOpen = computed(() => deleteTarget.value !== null)
+
+function requestDelete(id: number): void {
+  deleteTarget.value = id
+}
+
+async function onDelete(): Promise<void> {
+  const id = deleteTarget.value
+  if (id === null) return
+  deleteTarget.value = null
+  const ok = await store.remove(id)
+  if (ok) toast.success('笔记已删除')
+  else toast.error(error.value || '删除失败，请重试')
 }
 
 function excerpt(content: string): string {
@@ -111,7 +126,7 @@ function formatDate(value: string): string {
             <button
               class="note-card__act note-card__act--danger"
               title="删除"
-              @click.stop="onDelete(n.id)"
+              @click.stop="requestDelete(n.id)"
             >
               <AppIcon name="trash" :size="15" />
             </button>
@@ -131,6 +146,17 @@ function formatDate(value: string): string {
       v-else
       title="还没有笔记"
       description="点击右上角「新建笔记」，开始记录你的想法。"
+    />
+
+    <!-- 删除确认弹窗 -->
+    <ConfirmDialog
+      :open="deleteOpen"
+      title="删除笔记"
+      message="确定要删除这篇笔记吗？删除后不可恢复。"
+      confirm-text="删除"
+      danger
+      @confirm="onDelete"
+      @cancel="deleteTarget = null"
     />
   </div>
 </template>

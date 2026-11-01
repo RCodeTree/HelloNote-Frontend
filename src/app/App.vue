@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import DefaultLayout from '@/layouts/DefaultLayout.vue'
 import BlankLayout from '@/layouts/BlankLayout.vue'
+import AppToast from '@/components/feedback/AppToast.vue'
 import { useAppStore } from '@/stores/app.store'
 
 const route = useRoute()
@@ -25,6 +26,7 @@ appStore.initResponsive()
       </Transition>
     </RouterView>
   </component>
+  <AppToast />
 </template>
 
 <style>

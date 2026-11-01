@@ -3,20 +3,28 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '@/modules/auth'
+import { useTheme } from '@/composables/useTheme'
 import ProfileDialog from '@/modules/auth/components/ProfileDialog.vue'
 import UserAvatar from '@/components/common/UserAvatar.vue'
-import AppIcon from '@/components/common/AppIcon.vue'
+import AppIcon, { type IconName } from '@/components/common/AppIcon.vue'
 import { useAppStore } from '@/stores/app.store'
 
 const auth = useAuthStore()
 const app = useAppStore()
 const router = useRouter()
+const { themeStore, options, setMode } = useTheme()
 
 const { user, isAuthenticated } = storeToRefs(auth)
 const { sidebarCollapsed, isMobile } = storeToRefs(app)
 
 const menuOpen = ref(false)
 const profileOpen = ref(false)
+
+function iconFor(mode: string): IconName {
+  if (mode === 'light') return 'sun'
+  if (mode === 'dark') return 'moon'
+  return 'monitor'
+}
 
 function toggleMenu(): void {
   menuOpen.value = !menuOpen.value
@@ -56,10 +64,31 @@ function handleLogout(): void {
       <!-- 弹出菜单（贴底部向上展开） -->
       <Transition name="pop">
         <div v-if="menuOpen" class="sidebar-user__menu">
+          <!-- 主题切换：集成进用户菜单，置于第一行 -->
+          <div class="sidebar-user__section">
+            <span class="sidebar-user__section-label">主题</span>
+            <div class="sidebar-user__themes">
+              <button
+                v-for="opt in options"
+                :key="opt.value"
+                class="sidebar-user__theme"
+                :class="{ 'is-active': themeStore.mode === opt.value }"
+                :title="opt.label"
+                :aria-label="opt.label"
+                @click="setMode(opt.value)"
+              >
+                <AppIcon :name="iconFor(opt.value)" :size="16" />
+              </button>
+            </div>
+          </div>
+
+          <div class="sidebar-user__divider" />
+
           <button class="sidebar-user__item" @click="openProfile">
             <AppIcon name="user" :size="16" />
             <span>编辑资料</span>
           </button>
+
           <button class="sidebar-user__item sidebar-user__item--danger" @click="handleLogout">
             <AppIcon name="logout" :size="16" />
             <span>退出登录</span>
@@ -175,6 +204,53 @@ function handleLogout(): void {
 }
 .sidebar-user__item--danger:hover {
   color: var(--danger);
+}
+/* 菜单内的主题切换区块 */
+.sidebar-user__section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 4px 12px;
+}
+.sidebar-user__section-label {
+  font-size: 13px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.sidebar-user__themes {
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+}
+.sidebar-user__theme {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-standard);
+}
+.sidebar-user__theme:hover {
+  color: var(--text-primary);
+  background: var(--bg-card);
+}
+.sidebar-user__theme.is-active {
+  color: var(--accent-primary);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-card);
+}
+.sidebar-user__divider {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border-default);
 }
 .sidebar-user__backdrop {
   position: fixed;
