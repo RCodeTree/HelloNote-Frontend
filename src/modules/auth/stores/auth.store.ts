@@ -5,6 +5,35 @@ import type { AuthUser, LoginPayload, RegisterPayload } from '../types/auth.type
 
 const TOKEN_KEY = 'hellonote_token'
 
+// 后端字段名 → 中文提示
+const FIELD_LABELS: Record<string, string> = {
+  username: '用户名',
+  display_name: '昵称',
+  email: '邮箱',
+  password: '密码',
+  account: '账号',
+}
+
+// 从 Axios 错误中提取可读信息：
+// detail 为字符串（业务错误）直接用；为数组（422 校验错误）则转成中文句子。
+function toErrorMessage(e: unknown, fallback: string): string {
+  const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail
+  if (typeof detail === 'string' && detail) return detail
+  if (Array.isArray(detail) && detail.length > 0) {
+    const parts = detail.map((item) => {
+      const { loc, msg } = item as { loc?: unknown[]; msg?: string }
+      const field = Array.isArray(loc) && loc.length > 0 ? String(loc[loc.length - 1]) : ''
+      const label = FIELD_LABELS[field] ?? field
+      if (msg?.includes('Field required')) return `${label}为必填项`
+      if (msg?.includes('at least')) return `${label}长度不足`
+      if (msg?.includes('at most')) return `${label}长度超限`
+      return label ? `${label}格式不正确` : fallback
+    })
+    return parts.join('；')
+  }
+  return fallback
+}
+
 export const useAuthStore = defineStore('auth', () => {
   const token = ref<string | null>(localStorage.getItem(TOKEN_KEY))
   const user = ref<AuthUser | null>(null)
@@ -26,8 +55,8 @@ export const useAuthStore = defineStore('auth', () => {
       persist(res.token)
       user.value = res.user
       return true
-    } catch (e: any) {
-      error.value = e?.response?.data?.detail || '登录失败，请稍后重试'
+    } catch (e) {
+      error.value = toErrorMessage(e, '登录失败，请稍后重试')
       return false
     } finally {
       loading.value = false
@@ -41,8 +70,8 @@ export const useAuthStore = defineStore('auth', () => {
       const created = await authApi.register(payload)
       // 注册成功后自动登录
       return await login({ account: created.username, password: payload.password })
-    } catch (e: any) {
-      error.value = e?.response?.data?.detail || '注册失败，请稍后重试'
+    } catch (e) {
+      error.value = toErrorMessage(e, '注册失败，请稍后重试')
       return false
     } finally {
       loading.value = false

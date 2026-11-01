@@ -19,7 +19,25 @@ function switchMode(m: 'login' | 'register'): void {
 const loginForm = reactive({ account: '', password: '' })
 const registerForm = reactive({ username: '', displayName: '', email: '', password: '' })
 
+const EMAIL_RE = /^[\w.+-]+@[\w-]+(\.[\w-]+)+$/
+
+// 提交前校验：给出即时中文提示，避免依赖后端 422
+function validateRegister(): string | null {
+  if (registerForm.username.trim().length < 3) return '用户名至少 3 个字符'
+  if (registerForm.displayName.trim().length < 1) return '请填写昵称'
+  if (!EMAIL_RE.test(registerForm.email.trim())) return '请输入有效的邮箱地址'
+  if (registerForm.password.length < 6) return '密码至少 6 位'
+  return null
+}
+
 async function onSubmit(): Promise<void> {
+  if (mode.value === 'register') {
+    const invalid = validateRegister()
+    if (invalid) {
+      auth.error = invalid
+      return
+    }
+  }
   let ok = false
   if (mode.value === 'login') {
     ok = await auth.login({ account: loginForm.account, password: loginForm.password })

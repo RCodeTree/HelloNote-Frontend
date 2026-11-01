@@ -25,7 +25,13 @@ export async function login(payload: LoginPayload): Promise<{ token: string; use
 }
 
 export async function register(payload: RegisterPayload): Promise<AuthUser> {
-  const { data } = await http.post<RawUser>('/auth/register', payload)
+  // 后端请求体为 snake_case：displayName → display_name
+  const { data } = await http.post<RawUser>('/auth/register', {
+    username: payload.username,
+    display_name: payload.displayName,
+    email: payload.email,
+    password: payload.password,
+  })
   return mapUser(data)
 }
 
