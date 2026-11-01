@@ -95,10 +95,6 @@ function onNavClick(): void {
       >
         <AppLogo :show-text="!sidebarCollapsed" />
       </button>
-      <!-- 移动端抽屉：右上角关闭按钮 -->
-      <button v-if="isMobile" class="sidebar__close" aria-label="关闭菜单" @click="app.closeMobile">
-        <AppIcon name="close" :size="18" />
-      </button>
     </div>
 
     <nav class="sidebar__nav">
@@ -227,6 +223,10 @@ function onNavClick(): void {
 .sidebar--collapsed .sidebar__top {
   justify-content: center;
 }
+/* 移动端抽屉：去掉关闭按钮后，品牌标题居中更平衡对称 */
+.sidebar--mobile .sidebar__top {
+  justify-content: center;
+}
 /* 品牌标题：按钮化，大屏点击展开完整侧栏 */
 .sidebar__brand {
   display: inline-flex;
@@ -242,23 +242,6 @@ function onNavClick(): void {
 .sidebar__brand:hover {
   background: var(--bg-secondary);
 }
-.sidebar__close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-default);
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all var(--duration-fast) var(--ease-standard);
-}
-.sidebar__close:hover {
-  color: var(--text-primary);
-}
-
 .sidebar__nav {
   display: flex;
   flex-direction: column;
