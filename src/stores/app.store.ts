@@ -1,31 +1,43 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
-const SIDEBAR_COLLAPSED_KEY = 'hellonote_sidebar_collapsed'
+export type SidebarMode = 'full' | 'rail' | 'hidden'
+
+const SIDEBAR_MODE_KEY = 'hellonote_sidebar_mode'
 
 export const useAppStore = defineStore('app', () => {
-  // 用户手动折叠偏好（持久化）
-  const manualCollapsed = ref<boolean>(localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1')
+  // 侧栏显示模式（持久化）：full=完整 / rail=仅图标 / hidden=全隐藏+悬停弹出
+  const savedMode = localStorage.getItem(SIDEBAR_MODE_KEY)
+  const sidebarMode = ref<SidebarMode>(
+    savedMode === 'rail' || savedMode === 'hidden' ? savedMode : 'full',
+  )
   // 视口自适应状态：<768 视为移动端（抽屉），768~1024 自动收起为图标栏
   const isMobile = ref<boolean>(false)
   const autoCollapsed = ref<boolean>(false)
   // 移动端抽屉开关（手动）
   const mobileOpen = ref<boolean>(false)
 
-  // 实际折叠态：移动端不折叠（改用抽屉）；其余取「自动 || 手动」
-  const sidebarCollapsed = computed(() =>
-    isMobile.value ? false : autoCollapsed.value || manualCollapsed.value,
-  )
+  // 实际生效模式：移动端走抽屉（视为 full 布局）；中屏把 full 降级为 rail
+  const effectiveMode = computed<SidebarMode>(() => {
+    if (isMobile.value) return 'full'
+    if (autoCollapsed.value && sidebarMode.value === 'full') return 'rail'
+    return sidebarMode.value
+  })
 
-  // 侧栏实际宽度（px）：用于笔记编辑抽屉等需贴合侧栏右缘的元素定位。
-  // 移动端侧栏为覆盖式抽屉，编辑区应占满全屏（宽度 0）。
-  const sidebarWidth = computed<number>(() =>
-    isMobile.value ? 0 : sidebarCollapsed.value ? 76 : 240,
-  )
+  // 「仅图标」紧凑态（rail）：供 SidebarUser 等组件切换紧凑样式
+  const sidebarCollapsed = computed(() => !isMobile.value && effectiveMode.value === 'rail')
 
-  function toggleCollapsed(): void {
-    manualCollapsed.value = !manualCollapsed.value
-    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, manualCollapsed.value ? '1' : '0')
+  // 侧栏实际宽度（px）：hidden 模式侧栏脱离文档流，内容区占满全屏（宽度 0）
+  const sidebarWidth = computed<number>(() => {
+    if (isMobile.value) return 0
+    if (effectiveMode.value === 'rail') return 76
+    if (effectiveMode.value === 'hidden') return 0
+    return 240
+  })
+
+  function setSidebarMode(mode: SidebarMode): void {
+    sidebarMode.value = mode
+    localStorage.setItem(SIDEBAR_MODE_KEY, mode)
   }
 
   function toggleMobile(): void {
@@ -51,13 +63,14 @@ export const useAppStore = defineStore('app', () => {
   }
 
   return {
-    manualCollapsed,
+    sidebarMode,
+    effectiveMode,
+    setSidebarMode,
     isMobile,
     autoCollapsed,
     mobileOpen,
     sidebarCollapsed,
     sidebarWidth,
-    toggleCollapsed,
     toggleMobile,
     closeMobile,
     initResponsive,

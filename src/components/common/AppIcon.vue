@@ -33,6 +33,9 @@ export type IconName =
   | 'quote'
   | 'eye'
   | 'upload'
+  | 'layout-full'
+  | 'layout-rail'
+  | 'layout-hidden'
 </script>
 
 <script setup lang="ts">
@@ -79,6 +82,9 @@ const paths: Record<IconName, string> = {
   quote: 'M5 5h5v6H7c0 2 1 3 3 3v3c-4 0-5-3-5-6zM14 5h5v6h-3c0 2 1 3 3 3v3c-4 0-5-3-5-6z',
   eye: 'M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
   upload: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12',
+  'layout-full': 'M3 4h18v16H3zM9 4v16M15 4v16',
+  'layout-rail': 'M3 4h18v16H3zM9 4v16',
+  'layout-hidden': 'M3 4h18v16H3z',
 }
 </script>
 
