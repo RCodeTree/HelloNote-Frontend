@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useNotesStore } from '../stores/notes.store'
 import AppIcon from '@/components/common/AppIcon.vue'
@@ -8,11 +9,25 @@ import EmptyState from '@/components/feedback/EmptyState.vue'
 import SkeletonCard from '@/components/feedback/SkeletonCard.vue'
 
 const store = useNotesStore()
+const router = useRouter()
 const { notes, loading, error, search, selectedTagId, tags, total } = storeToRefs(store)
 
 onMounted(() => {
   void store.init()
 })
+
+function openEditor(id: number): void {
+  void router.push(`/notes/${id}/edit`)
+}
+
+function openCreate(): void {
+  void router.push('/notes/new')
+}
+
+async function onDelete(id: number): Promise<void> {
+  if (!window.confirm('确定删除这篇笔记吗？删除后不可恢复。')) return
+  await store.remove(id)
+}
 
 function excerpt(content: string): string {
   return content.replace(/\s+/g, ' ').trim().slice(0, 140) || '（空白笔记）'
@@ -32,7 +47,7 @@ function formatDate(value: string): string {
         <h1 class="notes__title">我的笔记</h1>
         <p class="notes__sub">共 {{ total }} 篇</p>
       </div>
-      <button class="notes__create" @click="store.openCreate()">
+      <button class="notes__create" @click="openCreate">
         <AppIcon name="plus" :size="16" />
         <span>新建笔记</span>
       </button>
@@ -80,7 +95,7 @@ function formatDate(value: string): string {
         v-for="n in notes"
         :key="n.id"
         class="note-card"
-        @click="store.openEdit(n.id)"
+        @click="openEditor(n.id)"
       >
         <div class="note-card__top">
           <h3 class="note-card__title">{{ n.title }}</h3>
@@ -96,7 +111,7 @@ function formatDate(value: string): string {
             <button
               class="note-card__act note-card__act--danger"
               title="删除"
-              @click.stop="store.remove(n.id)"
+              @click.stop="onDelete(n.id)"
             >
               <AppIcon name="trash" :size="15" />
             </button>

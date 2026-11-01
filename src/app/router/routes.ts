@@ -28,6 +28,18 @@ export const routes: RouteRecordRaw[] = [
     meta: { title: '笔记', layout: 'default', requiresAuth: true },
   },
   {
+    path: '/notes/new',
+    name: 'note-new',
+    component: () => import('@/modules/notes/pages/NotesEditorPage.vue'),
+    meta: { title: '新建笔记', layout: 'default', requiresAuth: true },
+  },
+  {
+    path: '/notes/:id/edit',
+    name: 'note-edit',
+    component: () => import('@/modules/notes/pages/NotesEditorPage.vue'),
+    meta: { title: '编辑笔记', layout: 'default', requiresAuth: true },
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
     component: () => import('@/modules/home/pages/NotFoundPage.vue'),

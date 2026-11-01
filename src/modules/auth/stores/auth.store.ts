@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import * as authApi from '../api/auth.api'
-import type { AuthUser, LoginPayload, RegisterPayload } from '../types/auth.types'
+import type { AuthUser, LoginPayload, RegisterPayload, UpdateProfilePayload } from '../types/auth.types'
 
 const TOKEN_KEY = 'hellonote_token'
 
@@ -87,11 +87,25 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function updateProfile(payload: UpdateProfilePayload): Promise<boolean> {
+    loading.value = true
+    error.value = null
+    try {
+      user.value = await authApi.updateMe(payload)
+      return true
+    } catch (e) {
+      error.value = toErrorMessage(e, '保存失败，请稍后重试')
+      return false
+    } finally {
+      loading.value = false
+    }
+  }
+
   function logout(): void {
     token.value = null
     user.value = null
     localStorage.removeItem(TOKEN_KEY)
   }
 
-  return { token, user, loading, error, isAuthenticated, login, register, fetchUser, logout }
+  return { token, user, loading, error, isAuthenticated, login, register, fetchUser, updateProfile, logout }
 })

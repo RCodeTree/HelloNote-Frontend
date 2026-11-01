@@ -4,6 +4,7 @@ import { storeToRefs } from 'pinia'
 import { useAppStore } from '@/stores/app.store'
 import AppIcon, { type IconName } from '@/components/common/AppIcon.vue'
 import AppLogo from '@/components/common/AppLogo.vue'
+import SidebarUser from '@/components/layout/SidebarUser.vue'
 
 const app = useAppStore()
 const route = useRoute()
@@ -82,6 +83,9 @@ const navItems: NavItem[] = [
         <span class="sidebar__link-label">笔记</span>
       </RouterLink>
     </nav>
+
+    <!-- 侧栏底部：用户登录态 / 资料与退出入口 -->
+    <SidebarUser />
 
     <!-- 桌面端：收起/展开按钮悬浮于侧栏右侧垂直居中 -->
     <button

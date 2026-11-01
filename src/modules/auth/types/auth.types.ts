@@ -35,3 +35,9 @@ export interface RegisterPayload {
   email: string
   password: string
 }
+
+export interface UpdateProfilePayload {
+  displayName?: string
+  /** 传空字符串表示清除头像 */
+  avatarUrl?: string | null
+}

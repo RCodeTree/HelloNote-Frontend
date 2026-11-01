@@ -5,6 +5,7 @@ import type {
   RawTokenResponse,
   RawUser,
   RegisterPayload,
+  UpdateProfilePayload,
 } from '../types/auth.types'
 
 function mapUser(raw: RawUser): AuthUser { // 将后端返回的 snake_case 映射为前端 camelCase 领域模型
@@ -37,5 +38,14 @@ export async function register(payload: RegisterPayload): Promise<AuthUser> {
 
 export async function fetchMe(): Promise<AuthUser> {
   const { data } = await http.get<RawUser>('/auth/me')
+  return mapUser(data)
+}
+
+// 更新当前用户资料（昵称/头像）；avatarUrl 传空字符串表示清除头像
+export async function updateMe(payload: UpdateProfilePayload): Promise<AuthUser> {
+  const body: Record<string, unknown> = {}
+  if (payload.displayName !== undefined) body.display_name = payload.displayName
+  if (payload.avatarUrl !== undefined) body.avatar_url = payload.avatarUrl ?? ''
+  const { data } = await http.patch<RawUser>('/auth/me', body)
   return mapUser(data)
 }
