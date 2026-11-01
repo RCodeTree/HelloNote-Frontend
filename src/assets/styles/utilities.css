@@ -54,6 +54,17 @@
   transform: translateY(-6px);
 }
 
+/* 通用淡入淡出过渡（遮罩/背景层）：供任意组件 <Transition name="fade"> 复用，
+   此前仅 ProfileDialog 体内定义，AppSidebar 的移动端遮罩因缺失该类而瞬现瞬隐 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity var(--duration-normal) var(--ease-standard);
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
 /* 滚动条主题适配 */
 * {
   scrollbar-width: thin;
@@ -97,7 +108,9 @@
   .page-enter-active,
   .page-leave-active,
   .dropdown-enter-active,
-  .dropdown-leave-active {
+  .dropdown-leave-active,
+  .fade-enter-active,
+  .fade-leave-active {
     transition: none;
   }
   .theme-transition,
