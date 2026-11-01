@@ -194,12 +194,16 @@ function onNavClick(): void {
   top: 0;
   left: 0;
   width: 240px;
-  transform: translateX(-102%);
-  transition: transform var(--duration-base) var(--ease-standard), width var(--duration-base) var(--ease-standard);
+  transform: translateX(-104%);
+  opacity: 0;
+  transition: transform var(--duration-base) var(--ease-emphasized),
+    opacity var(--duration-base) var(--ease-emphasized);
+  will-change: transform, opacity;
   box-shadow: var(--shadow-floating);
 }
 .sidebar--hidden.is-peek {
   transform: translateX(0);
+  opacity: 1;
 }
 
 /* 自动隐藏模式下贴近左缘的悬浮感应区（隐形，占满高度） */
@@ -332,7 +336,6 @@ function onNavClick(): void {
 .sidebar__mode.is-active {
   color: var(--accent-primary);
   background: var(--bg-card);
-  box-shadow: var(--shadow-card);
 }
 
 /* 中小屏：侧边垂直居中悬浮小箭头 —— 默认低调、空闲无高亮，hover 才点亮 */

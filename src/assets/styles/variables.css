@@ -29,9 +29,12 @@
 
   /* Animation */
   --duration-fast: 150ms;
+  --duration-base: 220ms;
   --duration-normal: 200ms;
   --duration-slow: 300ms;
   --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  /* 强调缓动：起步快、收尾极缓，适合侧栏滑入等需要「自然减速」的场景 */
+  --ease-emphasized: cubic-bezier(0.22, 1, 0.36, 1);
 
   /* Semantic extras */
   --danger: #9a4a3c;
