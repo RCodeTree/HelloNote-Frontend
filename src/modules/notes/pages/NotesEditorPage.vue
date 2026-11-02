@@ -457,7 +457,8 @@ function formatDate(value: string | undefined): string {
         <!-- 预览：Markdown 渲染结果（已转义，防注入）；仅 Markdown 格式可进入 -->
         <div v-if="showPreview && form.format === 'markdown'" class="editor__preview" v-html="previewHtml" />
         <p v-if="error" class="editor__error">{{ error }}</p>
-        <p class="editor__shortcut">Ctrl / ⌘ + S 快速保存</p>
+        <!-- 快捷键提示仅编辑态显示：预览态不编辑，提示悬在渲染内容末尾只会干扰阅读 -->
+        <p v-if="!showPreview" class="editor__shortcut">Ctrl / ⌘ + S 快速保存</p>
       </article>
 
       <!-- 底部固定栏：标签编辑（grid 第三行，固定置底，不随内容滚动） -->
