@@ -3,13 +3,14 @@ import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from
 import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useNotesStore } from '../stores/notes.store'
-import type { NoteCreatePayload, Tag } from '../types/notes.types'
+import type { NoteCreatePayload, NoteFormat, NoteOutlineNode, Tag } from '../types/notes.types'
 import AppIcon from '@/components/common/AppIcon.vue'
 import BaseButton from '@/components/common/BaseButton.vue'
 import BaseTag from '@/components/common/BaseTag.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import TagSelect from '../components/TagSelect.vue'
 import EditorToolbar, { type ToolCommand } from '../components/EditorToolbar.vue'
+import NoteOutline from '../components/NoteOutline.vue'
 import { mdToHtml } from '../utils/markdown'
 import { useToast } from '@/composables/useToast'
 
@@ -26,7 +27,13 @@ const noteId = computed<number | null>(() => {
 })
 const isEdit = computed(() => noteId.value !== null)
 
-const form = reactive({ title: '', content: '', isPinned: false, tagIds: [] as number[] })
+const form = reactive({
+  title: '',
+  content: '',
+  format: 'markdown' as NoteFormat,
+  isPinned: false,
+  tagIds: [] as number[],
+})
 
 // 快照必须是响应式 ref：保存成功后仅快照变化、form 不变时，
 // dirty 计算属性才会重新求值（普通变量不会触发，导致“未保存”不消失、按钮仍可点击）。
@@ -44,13 +51,17 @@ function takeSnapshot(): void {
 function fillFromNote(note: {
   title: string
   content: string
+  format?: NoteFormat
   isPinned: boolean
   tags: { id: number }[]
 }): void {
   form.title = note.title
   form.content = note.content
+  form.format = note.format ?? 'markdown'
   form.isPinned = note.isPinned
   form.tagIds = note.tags.map((t) => t.id)
+  // 纯文本笔记不应停留在预览态
+  showPreview.value = form.format === 'markdown' ? showPreview.value : false
   takeSnapshot()
   void nextTick(autosize)
 }
@@ -58,8 +69,10 @@ function fillFromNote(note: {
 function resetForm(): void {
   form.title = ''
   form.content = ''
+  form.format = 'markdown'
   form.isPinned = false
   form.tagIds = []
+  showPreview.value = false
   takeSnapshot()
 }
 
@@ -81,13 +94,21 @@ onMounted(() => {
   if (!store.notes.length) void store.loadNotes()
   if (!store.tags.length) void store.loadTags()
   void loadTarget()
-  // 视口宽度变化会改变换行，需重算 textarea 高度
-  window.addEventListener('resize', autosize)
+  // 视口宽度变化会改变换行，需重算 textarea 高度与大纲定位
+  window.addEventListener('resize', onResize)
 })
 
 onUnmounted(() => {
-  window.removeEventListener('resize', autosize)
+  window.removeEventListener('resize', onResize)
+  if (scrollRaf) cancelAnimationFrame(scrollRaf)
+  if (mirrorTimer) clearTimeout(mirrorTimer)
 })
+
+/** 视口变化：textarea 高度 + 镜像重新测量 */
+function onResize(): void {
+  autosize()
+  void nextTick(measureHeadings)
+}
 
 // 路由参数变化（下拉切换笔记）时重新加载
 watch(noteId, () => void loadTarget())
@@ -101,6 +122,7 @@ async function onSave(): Promise<void> {
   const payload: NoteCreatePayload = {
     title: form.title.trim(),
     content: form.content,
+    format: form.format,
     isPinned: form.isPinned,
     tagIds: form.tagIds,
   }
@@ -184,9 +206,123 @@ watch(currentLoading, (v) => {
   if (!v) void nextTick(autosize)
 })
 
-// —— 富文本操作：Markdown 快捷插入 + 实时预览 ——
+// —— 富文本操作：格式区分 + Markdown 快捷插入 + 实时预览 ——
+// 预览仅对需要解析的格式（Markdown）可用；纯文本「所写即所见」，无需预览。
 const showPreview = ref(false)
-const previewHtml = computed(() => (showPreview.value ? mdToHtml(form.content) : ''))
+const previewHtml = computed(() =>
+  showPreview.value && form.format === 'markdown' ? mdToHtml(form.content) : '',
+)
+
+/** 切换内容格式：转纯文本时退出预览（无可解析内容） */
+function onFormatChange(format: NoteFormat): void {
+  if (form.format === format) return
+  form.format = format
+  if (format === 'text') showPreview.value = false
+}
+
+// —— 右侧大纲：解析 Markdown 标题 → 悬浮预览 + 点击定位 ——
+const outlineNodes = computed<NoteOutlineNode[]>(() => {
+  if (form.format !== 'markdown') return []
+  const lines = form.content.replace(/\r\n/g, '\n').split('\n')
+  const nodes: NoteOutlineNode[] = []
+  for (let i = 0; i < lines.length; i += 1) {
+    const m = lines[i].match(/^(#{1,6})\s+(.+?)\s*$/)
+    if (!m) continue
+    // 摘要：取该标题到下一个标题之间的正文（拼成一段，截断展示）
+    const snippetLines: string[] = []
+    for (let j = i + 1; j < lines.length; j += 1) {
+      if (/^#{1,6}\s+/.test(lines[j])) break
+      if (lines[j].trim()) snippetLines.push(lines[j].trim())
+      if (snippetLines.join(' ').length >= 160) break
+    }
+    nodes.push({
+      id: `h-${i}`,
+      level: m[1].length,
+      text: m[2],
+      snippet: snippetLines.join(' ').slice(0, 160),
+      line: i,
+    })
+  }
+  return nodes
+})
+
+// 隐藏镜像层：以与正文完全相同的排版逐行渲染内容，
+// 用于精确测量每个标题行的纵向位置（textarea 无法按行测量，且自动换行影响行高估算）。
+const mainEl = ref<HTMLElement | null>(null)
+const mirrorEl = ref<HTMLElement | null>(null)
+const mirrorLines = ref<string[]>([])
+const headingTops = ref<number[]>([])
+const activeOutlineId = ref<string | null>(null)
+
+let mirrorTimer: ReturnType<typeof setTimeout> | null = null
+watch(
+  () => form.content,
+  () => {
+    if (mirrorTimer) clearTimeout(mirrorTimer)
+    // 轻防抖：输入停顿后再重建镜像并测量，避免每个按键都触发布局
+    mirrorTimer = setTimeout(() => {
+      mirrorLines.value = form.content.replace(/\r\n/g, '\n').split('\n')
+      void nextTick(measureHeadings)
+    }, 200)
+  },
+)
+watch(
+  () => [form.format, showPreview.value] as const,
+  () => {
+    if (!showPreview.value && form.format === 'markdown') void nextTick(measureHeadings)
+    else activeOutlineId.value = null
+  },
+)
+
+/** 测量镜像层中各标题行的 offsetTop，与大纲节点一一对应 */
+function measureHeadings(): void {
+  const mirror = mirrorEl.value
+  if (!mirror || !outlineNodes.value.length) {
+    headingTops.value = []
+    return
+  }
+  headingTops.value = outlineNodes.value.map((node) => {
+    const child = mirror.children[node.line] as HTMLElement | undefined
+    return child?.offsetTop ?? 0
+  })
+}
+
+/** 点击大纲节点：平滑滚动到对应标题行（编辑态） */
+function jumpToHeading(id: string): void {
+  const index = outlineNodes.value.findIndex((n) => n.id === id)
+  const main = mainEl.value
+  const content = contentEl.value
+  if (index === -1 || !main || !content || !headingTops.value[index]) {
+    // 镜像未就绪（如刚打开笔记）时先测量再跳
+    void nextTick(() => {
+      measureHeadings()
+      jumpToHeading(id)
+    })
+    return
+  }
+  const top = content.offsetTop + headingTops.value[index] - 16
+  main.scrollTo({ top, behavior: 'smooth' })
+  activeOutlineId.value = id
+}
+
+// 滚动时高亮当前所在小节
+let scrollRaf = 0
+function onMainScroll(): void {
+  if (scrollRaf) return
+  scrollRaf = requestAnimationFrame(() => {
+    scrollRaf = 0
+    const main = mainEl.value
+    const content = contentEl.value
+    if (!main || !content || !headingTops.value.length) return
+    const y = main.scrollTop - content.offsetTop + 80
+    let current = -1
+    for (let i = 0; i < headingTops.value.length; i += 1) {
+      if (headingTops.value[i] <= y) current = i
+      else break
+    }
+    activeOutlineId.value = current >= 0 ? outlineNodes.value[current]?.id ?? null : null
+  })
+}
 
 /** 应用内容与选区：写入后等 DOM 更新再聚焦恢复选区并重算高度 */
 function commitContent(next: string, selStart: number, selEnd: number): void {
@@ -244,6 +380,8 @@ function stripLinePrefix(line: string): string {
 
 function applyCommand(cmd: ToolCommand): void {
   if (cmd === 'preview') {
+    // 纯文本无需解析预览（工具栏已禁用，这里兜底）
+    if (form.format !== 'markdown') return
     showPreview.value = !showPreview.value
     if (!showPreview.value) void nextTick(autosize)
     return
@@ -399,7 +537,7 @@ function formatDate(value: string | undefined): string {
 
     <template v-else>
       <!-- 中间可滚动编辑区（grid 第二行，minmax(0,1fr) 保证它永远被约束、内部滚动）：标题 + 元信息 + 正文 -->
-      <article class="editor__main">
+      <article ref="mainEl" class="editor__main" @scroll.passive="onMainScroll">
         <input
           v-model="form.title"
           class="editor__title"
@@ -414,7 +552,12 @@ function formatDate(value: string | undefined): string {
           </div>
         </div>
         <div class="editor__tools">
-          <EditorToolbar :previewing="showPreview" @command="applyCommand" />
+          <EditorToolbar
+            :previewing="showPreview"
+            :format="form.format"
+            @command="applyCommand"
+            @change-format="onFormatChange"
+          />
         </div>
         <textarea
           v-show="!showPreview"
@@ -424,11 +567,24 @@ function formatDate(value: string | undefined): string {
           placeholder="开始写下你的想法…"
           @input="autosize"
         />
-        <!-- 预览：Markdown 渲染结果（已转义，防注入） -->
-        <div v-if="showPreview" class="editor__preview" v-html="previewHtml" />
+        <!-- 预览：Markdown 渲染结果（已转义，防注入）；仅 Markdown 格式可进入 -->
+        <div v-if="showPreview && form.format === 'markdown'" class="editor__preview" v-html="previewHtml" />
         <p v-if="error" class="editor__error">{{ error }}</p>
         <p class="editor__shortcut">Ctrl / ⌘ + S 快速保存</p>
+
+        <!-- 隐藏镜像层：逐行复刻正文排版，供大纲精确测量标题行位置 -->
+        <div ref="mirrorEl" class="editor__mirror" aria-hidden="true">
+          <div v-for="(line, i) in mirrorLines" :key="i" class="editor__mirror-line">{{ line }}</div>
+        </div>
       </article>
+
+      <!-- 右侧大纲：Markdown 且存在多个标题时显示，悬浮预览、点击定位 -->
+      <NoteOutline
+        v-if="!showPreview && form.format === 'markdown' && outlineNodes.length >= 2"
+        :nodes="outlineNodes"
+        :active-id="activeOutlineId"
+        @jump="jumpToHeading"
+      />
 
       <!-- 底部固定栏：标签编辑（grid 第三行，固定置底，不随内容滚动） -->
       <footer class="editor__footer">
@@ -782,6 +938,27 @@ function formatDate(value: string | undefined): string {
   color: var(--text-muted);
   opacity: 0.5;
 }
+/* 隐藏镜像层：与正文同宽同排版（绝对定位于 .editor__main 内），仅用于测量，不可见不交互。
+   内边距必须与 .editor__main 的水平内边距一致，行宽才与 textarea 相同、换行位置才一致 */
+.editor__mirror {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 0 clamp(16px, 6vw, 64px);
+  visibility: hidden;
+  pointer-events: none;
+  z-index: -1;
+  font-size: 15px;
+  line-height: 1.9;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  color: var(--text-primary);
+}
+.editor__mirror-line {
+  min-height: 1.9em; /* 空行也占一行高，保证 offsetTop 与正文一致 */
+}
 .editor__tags-edit {
   display: flex;
   align-items: flex-start;
@@ -859,12 +1036,18 @@ function formatDate(value: string | undefined): string {
   .editor__main {
     padding: 12px 14px 20px;
   }
+  .editor__mirror {
+    padding: 0 14px;
+  }
   .editor__title {
     font-size: 24px; /* 小屏固定标题字号，避免 clamp 过大 */
   }
   .editor__content,
   .editor__preview {
     font-size: 16px; /* ≥16px 防止 iOS 聚焦自动放大 */
+  }
+  .editor__mirror {
+    font-size: 16px; /* 与小屏正文一致，保证大纲测量准确 */
   }
   .editor__shortcut {
     display: none; /* 移动端无键盘快捷键意义 */
@@ -888,6 +1071,9 @@ function formatDate(value: string | undefined): string {
   }
   .editor__main {
     padding: 20px 24px 28px;
+  }
+  .editor__mirror {
+    padding: 0 24px;
   }
   .editor__footer {
     padding: 8px 16px;

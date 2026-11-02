@@ -11,6 +11,7 @@ interface RawNote {
   id: number
   title: string
   content: string
+  format?: 'markdown' | 'text'
   is_pinned: boolean
   created_at: string
   updated_at: string
@@ -22,6 +23,8 @@ function mapNote(r: RawNote): Note {
     id: r.id,
     title: r.title,
     content: r.content,
+    // 兼容后端尚未迁移出 format 字段的过渡期
+    format: r.format ?? 'markdown',
     isPinned: r.is_pinned,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
@@ -62,6 +65,7 @@ export async function createNote(payload: NoteCreatePayload): Promise<Note> {
   const { data } = await http.post<RawNote>('/notes', {
     title: payload.title,
     content: payload.content,
+    format: payload.format,
     is_pinned: payload.isPinned,
     tag_ids: payload.tagIds,
   })
@@ -72,6 +76,7 @@ export async function updateNote(id: number, payload: NoteUpdatePayload): Promis
   const body: Record<string, unknown> = {}
   if (payload.title !== undefined) body.title = payload.title
   if (payload.content !== undefined) body.content = payload.content
+  if (payload.format !== undefined) body.format = payload.format
   if (payload.isPinned !== undefined) body.is_pinned = payload.isPinned
   if (payload.tagIds !== undefined) body.tag_ids = payload.tagIds
   const { data } = await http.put<RawNote>(`/notes/${id}`, body)

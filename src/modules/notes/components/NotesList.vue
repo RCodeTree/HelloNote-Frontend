@@ -68,6 +68,8 @@ async function onFilesChosen(e: Event): Promise<void> {
       const created = await store.submitCreate({
         title: note.title,
         content: note.content,
+        // .md / .html(已转 Markdown) 用 Markdown 格式；.txt 为纯文本
+        format: note.kind === 'txt' ? 'text' : 'markdown',
         isPinned: false,
         tagIds: [],
       })
