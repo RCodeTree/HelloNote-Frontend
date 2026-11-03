@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot } from '@headlessui/vue'
+import { onMounted, onBeforeUnmount, ref } from 'vue'
 import AppIcon from './AppIcon.vue'
 import BaseButton from './BaseButton.vue'
 
@@ -25,52 +25,40 @@ withDefaults(
 )
 
 const emit = defineEmits<{ confirm: []; third: []; cancel: [] }>()
+
+// 点击遮罩 / 按 Esc 关闭
+const cardRef = ref<HTMLElement | null>(null)
+function onKeydown(e: KeyboardEvent): void {
+  if (e.key === 'Escape') emit('cancel')
+}
+onMounted(() => {
+  window.addEventListener('keydown', onKeydown)
+  cardRef.value?.focus()
+})
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>
   <Teleport to="body">
-    <TransitionRoot :show="open" as="template">
-      <!-- @close 在按下 Esc 或点击面板外区域（遮罩）时触发，统一走取消逻辑 -->
-      <Dialog @close="emit('cancel')" class="confirm">
-        <TransitionChild
-          as="template"
-          enter="transition-opacity duration-150 ease-out"
-          enter-from="opacity-0"
-          enter-to="opacity-100"
-          leave="transition-opacity duration-150 ease-in"
-          leave-from="opacity-100"
-          leave-to="opacity-0"
-        >
-          <div class="confirm__scrim" />
-        </TransitionChild>
-        <TransitionChild
-          as="template"
-          enter="transition duration-150 ease-out"
-          enter-from="opacity-0 translate-y-1.5 scale-95"
-          enter-to="opacity-100 translate-y-0 scale-100"
-          leave="transition duration-150 ease-in"
-          leave-from="opacity-100 translate-y-0 scale-100"
-          leave-to="opacity-0 translate-y-1.5 scale-95"
-        >
-          <DialogPanel class="confirm__card">
-            <div v-if="danger" class="confirm__icon is-danger">
-              <AppIcon name="trash" :size="18" />
-            </div>
-            <DialogTitle class="confirm__title">{{ title }}</DialogTitle>
-            <p v-if="message" class="confirm__message">{{ message }}</p>
-            <div class="confirm__actions">
-              <BaseButton v-if="thirdText" variant="ghost" size="sm" @click="emit('third')">
-                {{ thirdText }}
-              </BaseButton>
-              <BaseButton variant="ghost" size="sm" @click="emit('cancel')">{{ cancelText }}</BaseButton>
-              <BaseButton :variant="danger ? 'danger' : 'primary'" size="sm" @click="emit('confirm')">
-                {{ confirmText }}
-              </BaseButton>
-            </div>
-          </DialogPanel>
-        </TransitionChild>
-      </Dialog>
-    </TransitionRoot>
+    <div v-if="open" class="confirm">
+      <div class="confirm__scrim" @click="emit('cancel')" />
+      <div ref="cardRef" class="confirm__card" role="alertdialog" aria-modal="true" tabindex="-1">
+        <div v-if="danger" class="confirm__icon is-danger">
+          <AppIcon name="trash" :size="18" />
+        </div>
+        <h2 class="confirm__title">{{ title }}</h2>
+        <p v-if="message" class="confirm__message">{{ message }}</p>
+        <div class="confirm__actions">
+          <BaseButton v-if="thirdText" variant="ghost" size="sm" @click="emit('third')">
+            {{ thirdText }}
+          </BaseButton>
+          <BaseButton variant="ghost" size="sm" @click="emit('cancel')">{{ cancelText }}</BaseButton>
+          <BaseButton :variant="danger ? 'danger' : 'primary'" size="sm" @click="emit('confirm')">
+            {{ confirmText }}
+          </BaseButton>
+        </div>
+      </div>
+    </div>
   </Teleport>
 </template>
 
@@ -83,6 +71,15 @@ const emit = defineEmits<{ confirm: []; third: []; cancel: [] }>()
   align-items: center;
   justify-content: center;
   padding: 16px;
+  animation: modal-fade var(--duration-fast) var(--ease-standard);
+}
+@keyframes modal-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 .confirm__scrim {
   position: absolute;
@@ -102,6 +99,20 @@ const emit = defineEmits<{ confirm: []; third: []; cancel: [] }>()
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   box-shadow: var(--shadow-floating);
+  animation: confirm-pop var(--duration-fast) var(--ease-standard);
+}
+.confirm__card:focus {
+  outline: none;
+}
+@keyframes confirm-pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 .confirm__icon {
   display: flex;

@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import { reactive, watch } from 'vue'
-import { Teleport } from 'vue'
-import { Dialog, DialogPanel, TransitionChild, TransitionRoot } from '@headlessui/vue'
+import { reactive, watch, onMounted, onBeforeUnmount, ref } from 'vue'
 import { useAuthStore } from '@/modules/auth'
 import UserAvatar from '@/components/common/UserAvatar.vue'
 import BaseInput from '@/components/common/BaseInput.vue'
@@ -46,82 +44,76 @@ async function onSave(): Promise<void> {
   })
   if (ok) emit('close')
 }
+
+// 点击遮罩 / 按 Esc 关闭
+const cardRef = ref<HTMLElement | null>(null)
+function onKeydown(e: KeyboardEvent): void {
+  if (e.key === 'Escape') emit('close')
+}
+onMounted(() => {
+  window.addEventListener('keydown', onKeydown)
+  cardRef.value?.focus()
+})
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>
   <Teleport to="body">
-    <TransitionRoot :show="open" as="template">
-      <!-- 焦点陷阱 / Esc / 点击遮罩关闭由 Dialog 统一处理 -->
-      <Dialog class="profile" @close="emit('close')">
-        <TransitionChild
-          as="template"
-          enter="transition-opacity duration-150 ease-out"
-          enter-from="opacity-0"
-          enter-to="opacity-100"
-          leave="transition-opacity duration-150 ease-in"
-          leave-from="opacity-100"
-          leave-to="opacity-0"
-        >
-          <div class="profile__scrim" />
-        </TransitionChild>
+    <div v-if="open" class="profile">
+      <div class="profile__scrim" @click="emit('close')" />
+      <div
+        ref="cardRef"
+        class="profile__card"
+        role="dialog"
+        aria-modal="true"
+        aria-label="编辑个人资料"
+        tabindex="-1"
+      >
+        <header class="profile__head">
+          <h2 class="profile__title">编辑个人资料</h2>
+          <button class="profile__close" aria-label="关闭" @click="emit('close')">
+            <AppIcon name="close" :size="18" />
+          </button>
+        </header>
 
-        <TransitionChild
-          as="template"
-          enter="transition duration-150 ease-out"
-          enter-from="opacity-0 translate-y-1.5 scale-95"
-          enter-to="opacity-100 translate-y-0 scale-100"
-          leave="transition duration-150 ease-in"
-          leave-from="opacity-100 translate-y-0 scale-100"
-          leave-to="opacity-0 translate-y-1.5 scale-95"
-        >
-          <DialogPanel class="profile__card">
-            <header class="profile__head">
-              <h2 class="profile__title">编辑个人资料</h2>
-              <button class="profile__close" aria-label="关闭" @click="emit('close')">
-                <AppIcon name="close" :size="18" />
+        <div class="profile__body">
+          <div class="profile__preview">
+            <UserAvatar
+              :name="form.displayName || auth.user?.username || '?'"
+              :url="form.avatarUrl || null"
+              :size="64"
+            />
+          </div>
+
+          <div class="profile__field">
+            <span class="profile__label">头像</span>
+            <div class="profile__grid">
+              <button
+                v-for="emoji in PRESET_AVATARS"
+                :key="emoji"
+                type="button"
+                class="profile__emoji"
+                :class="{ 'is-active': form.avatarUrl === emoji }"
+                @click="pickPreset(emoji)"
+              >
+                {{ emoji }}
               </button>
-            </header>
-
-            <div class="profile__body">
-              <div class="profile__preview">
-                <UserAvatar
-                  :name="form.displayName || auth.user?.username || '?'"
-                  :url="form.avatarUrl || null"
-                  :size="64"
-                />
-              </div>
-
-              <div class="profile__field">
-                <span class="profile__label">头像</span>
-                <div class="profile__grid">
-                  <button
-                    v-for="emoji in PRESET_AVATARS"
-                    :key="emoji"
-                    type="button"
-                    class="profile__emoji"
-                    :class="{ 'is-active': form.avatarUrl === emoji }"
-                    @click="pickPreset(emoji)"
-                  >
-                    {{ emoji }}
-                  </button>
-                </div>
-                <BaseInput v-model="form.avatarUrl" placeholder="或粘贴头像图片链接（留空使用首字母头像）" />
-              </div>
-
-              <BaseInput v-model="form.displayName" label="昵称" placeholder="输入新的昵称" />
-              <p class="profile__hint">用户名 @{{ auth.user?.username }} 不可修改</p>
-
-              <p v-if="auth.error" class="profile__error">{{ auth.error }}</p>
             </div>
+            <BaseInput v-model="form.avatarUrl" placeholder="或粘贴头像图片链接（留空使用首字母头像）" />
+          </div>
 
-            <footer class="profile__foot">
-              <BaseButton variant="ghost" :disabled="auth.loading" @click="emit('close')">取消</BaseButton>
-              <BaseButton variant="primary" :loading="auth.loading" @click="onSave">保存</BaseButton>
-            </footer>
-          </DialogPanel>
-        </TransitionChild>
-      </Dialog>
-    </TransitionRoot>
+          <BaseInput v-model="form.displayName" label="昵称" placeholder="输入新的昵称" />
+          <p class="profile__hint">用户名 @{{ auth.user?.username }} 不可修改</p>
+
+          <p v-if="auth.error" class="profile__error">{{ auth.error }}</p>
+        </div>
+
+        <footer class="profile__foot">
+          <BaseButton variant="ghost" :disabled="auth.loading" @click="emit('close')">取消</BaseButton>
+          <BaseButton variant="primary" :loading="auth.loading" @click="onSave">保存</BaseButton>
+        </footer>
+      </div>
+    </div>
   </Teleport>
 </template>
 
@@ -134,6 +126,15 @@ async function onSave(): Promise<void> {
   align-items: center;
   justify-content: center;
   padding: var(--space-4);
+  animation: modal-fade var(--duration-fast) var(--ease-standard);
+}
+@keyframes modal-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 .profile__scrim {
   position: absolute;
@@ -151,6 +152,20 @@ async function onSave(): Promise<void> {
   border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-floating);
+  animation: profile-pop var(--duration-fast) var(--ease-standard);
+}
+.profile__card:focus {
+  outline: none;
+}
+@keyframes profile-pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 .profile__head {
   display: flex;
