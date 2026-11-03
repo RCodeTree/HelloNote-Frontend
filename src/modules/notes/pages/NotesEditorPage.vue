@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useNotesStore } from '../stores/notes.store'
 import type { NoteCreatePayload, NoteFormat, Tag } from '../types/notes.types'
@@ -62,7 +62,6 @@ function fillFromNote(note: {
   // 纯文本笔记不应停留在预览态
   showPreview.value = form.format === 'markdown' ? showPreview.value : false
   takeSnapshot()
-  void nextTick(autosize)
 }
 
 function resetForm(): void {
@@ -93,16 +92,46 @@ onMounted(() => {
   if (!store.notes.length) void store.loadNotes()
   if (!store.tags.length) void store.loadTags()
   void loadTarget()
-  // 视口宽度变化会改变换行，需重算 textarea 高度
-  window.addEventListener('resize', autosize)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('resize', autosize)
 })
 
 // 路由参数变化（下拉切换笔记）时重新加载
 watch(noteId, () => void loadTarget())
+
+// —— 未保存离场守卫：有修改未保存时，用模态框提醒而不是静默丢失 ——
+// 文本域改为固定高度 + 内部滚动后不再依赖 autosize，故此处仅做离场拦截。
+const unsavedOpen = ref(false)
+let unsavedResolve: ((proceed: boolean) => void) | null = null
+
+function requestUnsavedGuard(): Promise<boolean> {
+  unsavedOpen.value = true
+  return new Promise((resolve) => {
+    unsavedResolve = resolve
+  })
+}
+function finishUnsaved(proceed: boolean): void {
+  unsavedOpen.value = false
+  unsavedResolve?.(proceed)
+  unsavedResolve = null
+}
+function cancelUnsaved(): void {
+  finishUnsaved(false)
+}
+function discardUnsaved(): void {
+  finishUnsaved(true)
+}
+async function saveAndLeave(): Promise<void> {
+  await onSave()
+  finishUnsaved(true)
+}
+
+onBeforeRouteLeave(async () => {
+  if (!dirty.value) return true
+  return requestUnsavedGuard()
+})
+onBeforeRouteUpdate(async () => {
+  if (!dirty.value) return true
+  return requestUnsavedGuard()
+})
 
 async function onSave(): Promise<void> {
   if (saving.value) return
@@ -160,6 +189,77 @@ function togglePinLocal(): void {
   form.isPinned = !form.isPinned
 }
 
+// —— 导出笔记到本地：生成文件 → Blob → 浏览器原生「另存为」对话框（用户自行选择保存路径） ——
+type ExportFormat = 'md' | 'html' | 'txt'
+const exportOpen = ref(false)
+const exportFormats: { value: ExportFormat; label: string; ext: string; mime: string }[] = [
+  { value: 'md', label: 'Markdown (.md)', ext: 'md', mime: 'text/markdown' },
+  { value: 'html', label: 'HTML 网页 (.html)', ext: 'html', mime: 'text/html' },
+  { value: 'txt', label: '纯文本 (.txt)', ext: 'txt', mime: 'text/plain' },
+]
+
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] ?? c,
+  )
+}
+
+function safeFilename(title: string, ext: string): string {
+  const base = (title || 'untitled')
+    .trim()
+    .replace(/[\\/:*?"<>|]+/g, '_')
+    .slice(0, 80)
+  return `${base || 'untitled'}.${ext}`
+}
+
+function buildExportContent(fmt: ExportFormat): string {
+  if (fmt === 'txt') return form.content
+  if (fmt === 'md') {
+    return form.title ? `# ${form.title}\n\n${form.content}` : form.content
+  }
+  // HTML：复用项目内已转义渲染结果，包装成可独立打开的网页
+  const body = mdToHtml(form.content || '*（空笔记）*')
+  return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtml(form.title || '笔记')}</title>
+<style>
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans SC',sans-serif;max-width:760px;margin:40px auto;padding:0 16px;line-height:1.8;color:#222}
+  h1,h2,h3{line-height:1.4}
+  img{max-width:100%}
+  pre{background:#f5f5f5;padding:12px;border-radius:8px;overflow:auto}
+  code{background:#f5f5f5;padding:2px 4px;border-radius:4px}
+  blockquote{border-left:3px solid #ccc;margin:0;padding-left:12px;color:#666}
+  table{border-collapse:collapse}td,th{border:1px solid #ddd;padding:6px 10px}
+</style>
+</head>
+<body>
+<h1>${escapeHtml(form.title || '笔记')}</h1>
+${body}
+</body>
+</html>`
+}
+
+function exportNote(fmt: ExportFormat): void {
+  const item = exportFormats.find((f) => f.value === fmt)
+  if (!item) return
+  const filename = safeFilename(form.title, item.ext)
+  const content = buildExportContent(fmt)
+  const blob = new Blob([content], { type: `${item.mime};charset=utf-8` })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename // 浏览器据此弹出原生「另存为」对话框，用户可选择本地保存路径
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+  exportOpen.value = false
+  toast.success(`已导出：${filename}`)
+}
+
 /** 内联新建标签，成功后由 TagSelect 自动勾选 */
 async function handleCreateTag(name: string): Promise<Tag | null> {
   return store.addTag(name)
@@ -170,32 +270,19 @@ const menuOpen = ref(false)
 
 function switchTo(id: number): void {
   menuOpen.value = false
+  exportOpen.value = false
   if (id !== noteId.value) void router.push(`/notes/${id}/edit`)
 }
 
 function goCreate(): void {
   menuOpen.value = false
+  exportOpen.value = false
   if (!isEdit.value) return
   void router.push('/notes/new')
 }
 
-// —— 内容自适应高度：textarea 不出现自身滚动条，整页滚动浏览 ——
+// —— 正文文本域引用：编辑区内部滚动（固定高度 + overflow），不再使用 autosize 撑高 ——
 const contentEl = ref<HTMLTextAreaElement | null>(null)
-
-function autosize(): void {
-  const el = contentEl.value
-  if (!el) return
-  el.style.height = 'auto'
-  el.style.height = `${el.scrollHeight}px`
-}
-
-watch(
-  () => form.content,
-  () => void nextTick(autosize),
-)
-watch(currentLoading, (v) => {
-  if (!v) void nextTick(autosize)
-})
 
 // —— 富文本操作：格式区分 + Markdown 快捷插入 + 实时预览 ——
 // 预览仅对需要解析的格式（Markdown）可用；纯文本「所写即所见」，无需预览。
@@ -211,7 +298,17 @@ function onFormatChange(format: NoteFormat): void {
   if (format === 'text') showPreview.value = false
 }
 
-/** 应用内容与选区：写入后等 DOM 更新再聚焦恢复选区并重算高度 */
+// —— 滚动条「滚动时才出现」：滚动期间给编辑区/预览区加 is-scrolling，停顿后移除（默认隐藏） ——
+let scrollHideTimer: ReturnType<typeof setTimeout> | null = null
+function onAreaScroll(e: Event): void {
+  const el = e.target as HTMLElement
+  if (!el) return
+  el.classList.add('is-scrolling')
+  if (scrollHideTimer) clearTimeout(scrollHideTimer)
+  scrollHideTimer = setTimeout(() => el.classList.remove('is-scrolling'), 900)
+}
+
+/** 应用内容与选区：写入后等 DOM 更新再聚焦恢复选区（编辑区固定高度内部滚动，无需重算高度） */
 function commitContent(next: string, selStart: number, selEnd: number): void {
   form.content = next
   void nextTick(() => {
@@ -219,7 +316,6 @@ function commitContent(next: string, selStart: number, selEnd: number): void {
     if (!el) return
     el.focus()
     el.setSelectionRange(selStart, selEnd)
-    autosize()
   })
 }
 
@@ -270,7 +366,6 @@ function applyCommand(cmd: ToolCommand): void {
     // 纯文本无需解析预览（工具栏已禁用，这里兜底）
     if (form.format !== 'markdown') return
     showPreview.value = !showPreview.value
-    if (!showPreview.value) void nextTick(autosize)
     return
   }
   const el = contentEl.value
@@ -391,6 +486,32 @@ function formatDate(value: string | undefined): string {
           <AppIcon v-if="!dirty && !saving" name="check" :size="13" />
           {{ saveState }}
         </span>
+        <!-- 导出笔记：下拉选择格式，触发浏览器原生「另存为」对话框（可选本地保存路径） -->
+        <div class="editor__export">
+          <button
+            v-if="isEdit"
+            class="editor__iconbtn"
+            :class="{ 'is-active': exportOpen }"
+            title="导出笔记到本地"
+            @click="exportOpen = !exportOpen"
+          >
+            <AppIcon name="download" :size="17" />
+          </button>
+          <Transition name="pop">
+            <div v-if="exportOpen" class="export__menu">
+              <p class="export__title">导出为</p>
+              <button
+                v-for="f in exportFormats"
+                :key="f.value"
+                class="export__item"
+                @click="exportNote(f.value)"
+              >
+                {{ f.label }}
+              </button>
+            </div>
+          </Transition>
+          <div v-if="exportOpen" class="export__backdrop" @click="exportOpen = false" />
+        </div>
         <button
           v-if="isEdit"
           class="editor__iconbtn"
@@ -452,10 +573,15 @@ function formatDate(value: string | undefined): string {
           v-model="form.content"
           class="editor__content"
           placeholder="开始写下你的想法…"
-          @input="autosize"
+          @scroll="onAreaScroll"
         />
         <!-- 预览：Markdown 渲染结果（已转义，防注入）；仅 Markdown 格式可进入 -->
-        <div v-if="showPreview && form.format === 'markdown'" class="editor__preview" v-html="previewHtml" />
+        <div
+          v-if="showPreview && form.format === 'markdown'"
+          class="editor__preview"
+          v-html="previewHtml"
+          @scroll="onAreaScroll"
+        />
         <p v-if="error" class="editor__error">{{ error }}</p>
         <!-- 快捷键提示仅编辑态显示：预览态不编辑，提示悬在渲染内容末尾只会干扰阅读 -->
         <p v-if="!showPreview" class="editor__shortcut">Ctrl / ⌘ + S 快速保存</p>
@@ -479,6 +605,19 @@ function formatDate(value: string | undefined): string {
       danger
       @confirm="onDelete"
       @cancel="deleteOpen = false"
+    />
+
+    <!-- 未保存离场提醒：切换笔记 / 离开编辑器时若有未保存修改 -->
+    <ConfirmDialog
+      :open="unsavedOpen"
+      title="有未保存的修改"
+      message="当前笔记存在未保存的更改，离开后将丢失这些修改。"
+      confirm-text="保存并离开"
+      cancel-text="取消"
+      third-text="不保存离开"
+      @confirm="saveAndLeave"
+      @third="discardUnsaved"
+      @cancel="cancelUnsaved"
     />
   </div>
 </template>
@@ -543,6 +682,53 @@ function formatDate(value: string | undefined): string {
 }
 .editor__iconbtn--danger:hover {
   color: var(--danger);
+}
+/* 导出：相对定位容器 + 下拉菜单（玻璃浮层）+ 点击空白关闭的遮罩 */
+.editor__export {
+  position: relative;
+}
+.export__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+}
+.export__menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 75;
+  width: 200px;
+  padding: 6px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: var(--shadow-floating);
+}
+.export__title {
+  margin: 0 0 4px;
+  padding: 4px 10px 6px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+.export__item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-standard);
+}
+.export__item:hover {
+  background: var(--bg-card);
+  color: var(--text-primary);
 }
 .editor__divider {
   width: 1px;
@@ -727,11 +913,16 @@ function formatDate(value: string | undefined): string {
 /* 预览排版：与正文一致的阅读节奏 */
 .editor__preview {
   width: 100%;
+  flex: 1 1 auto;
   min-height: 160px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   font-size: 15px;
   line-height: 1.9;
   color: var(--text-primary);
   word-break: break-word;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
 }
 .editor__preview :deep(h1) {
   font-size: 1.6em;
@@ -796,9 +987,11 @@ function formatDate(value: string | undefined): string {
 /* 自适应高度：无固定高度、禁用 resize，由 JS 按 scrollHeight 撑开，中间区可滚动 */
 .editor__content {
   width: 100%;
-  height: auto;
+  /* 固定占据可用高度，内容超长时内部滚动，而非撑高撑出外层滚动条 */
+  flex: 1 1 auto;
   min-height: 160px;
-  overflow: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   resize: none;
   border: none;
   outline: none;
@@ -808,6 +1001,36 @@ function formatDate(value: string | undefined): string {
   line-height: 1.9;
   font-family: inherit;
   caret-color: var(--accent-primary);
+  /* 细滚动条：默认透明（自动隐藏），仅悬停或滚动时显色出现 */
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.editor__content:hover,
+.editor__content.is-scrolling,
+.editor__preview:hover,
+.editor__preview.is-scrolling {
+  scrollbar-color: var(--text-muted) transparent;
+}
+.editor__content::-webkit-scrollbar,
+.editor__preview::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.editor__content::-webkit-scrollbar-track,
+.editor__preview::-webkit-scrollbar-track {
+  background: transparent;
+}
+.editor__content::-webkit-scrollbar-thumb,
+.editor__preview::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 4px;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+.editor__content:hover::-webkit-scrollbar-thumb,
+.editor__content.is-scrolling::-webkit-scrollbar-thumb,
+.editor__preview:hover::-webkit-scrollbar-thumb,
+.editor__preview.is-scrolling::-webkit-scrollbar-thumb {
+  background: var(--text-muted);
 }
 .editor__content::placeholder {
   color: var(--text-muted);

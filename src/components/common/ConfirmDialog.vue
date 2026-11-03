@@ -11,6 +11,8 @@ const props = withDefaults(
     message?: string
     confirmText?: string
     cancelText?: string
+    /** 第三个按钮（如「不保存离开」）：置于最左，用于提供次级操作 */
+    thirdText?: string
     danger?: boolean
   }>(),
   {
@@ -18,11 +20,12 @@ const props = withDefaults(
     message: '',
     confirmText: '确认',
     cancelText: '取消',
+    thirdText: '',
     danger: false,
   },
 )
 
-const emit = defineEmits<{ confirm: []; cancel: [] }>()
+const emit = defineEmits<{ confirm: []; third: []; cancel: [] }>()
 
 function onKeydown(e: KeyboardEvent): void {
   if (!props.open) return
@@ -50,6 +53,9 @@ watch(
           <h3 class="confirm__title">{{ title }}</h3>
           <p v-if="message" class="confirm__message">{{ message }}</p>
           <div class="confirm__actions">
+            <BaseButton v-if="thirdText" variant="ghost" size="sm" @click="emit('third')">
+              {{ thirdText }}
+            </BaseButton>
             <BaseButton variant="ghost" size="sm" @click="emit('cancel')">{{ cancelText }}</BaseButton>
             <BaseButton :variant="danger ? 'danger' : 'primary'" size="sm" @click="emit('confirm')">
               {{ confirmText }}

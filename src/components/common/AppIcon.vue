@@ -36,6 +36,7 @@ export type IconName =
   | 'layout-full'
   | 'layout-rail'
   | 'layout-hidden'
+  | 'download'
 </script>
 
 <script setup lang="ts">
@@ -85,6 +86,7 @@ const paths: Record<IconName, string> = {
   'layout-full': 'M3 4h18v16H3zM9 4v16M15 4v16',
   'layout-rail': 'M3 4h18v16H3zM9 4v16',
   'layout-hidden': 'M3 4h18v16H3z',
+  download: 'M12 3v12M7 11l5 5 5-5M5 21h14',
 }
 </script>
 
