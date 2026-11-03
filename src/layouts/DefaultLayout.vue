@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
+import { useAppStore } from '@/stores/app.store'
 import AppSidebar from '@/components/layout/AppSidebar.vue'
 import TopbarActions from '@/components/layout/TopbarActions.vue'
+import ProfileDialog from '@/modules/auth/components/ProfileDialog.vue'
 
 const route = useRoute()
+const appStore = useAppStore()
 
 // fullBleed 路由（如笔记编辑器）不受内容区最大宽度与内边距限制，
 // 由页面自己控制布局，占满侧栏以外的全部区域。
@@ -23,6 +26,9 @@ const fullBleed = computed(() => route.meta.fullBleed === true)
       </div>
     </div>
   </div>
+
+  <!-- 个人资料弹窗：全站唯一实例，由 app store 的 profileOpen 控制显隐 -->
+  <ProfileDialog :open="appStore.profileOpen" @close="appStore.closeProfile()" />
 </template>
 
 <style scoped>

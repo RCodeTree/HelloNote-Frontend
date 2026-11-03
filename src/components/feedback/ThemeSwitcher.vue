@@ -1,42 +1,44 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { useTheme } from '@/composables/useTheme'
-import AppIcon, { type IconName } from '@/components/common/AppIcon.vue'
+import { computed } from 'vue'
+import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/vue'
+import { useThemeStore } from '@/stores/theme.store'
+import AppIcon from '@/components/common/AppIcon.vue'
 
-const { themeStore, options, setMode } = useTheme()
-const open = ref(false)
+const themeStore = useThemeStore()
 
-const currentIcon = computed<IconName>(() => {
-  if (themeStore.mode === 'system') return 'monitor'
-  return themeStore.resolvedTheme === 'dark' ? 'moon' : 'sun'
+const options = [
+  { value: 'light', label: '浅色', icon: 'sun' },
+  { value: 'dark', label: '深色', icon: 'moon' },
+  { value: 'system', label: '跟随系统', icon: 'monitor' },
+] as const
+
+const currentIcon = computed(() => {
+  if (themeStore.mode === 'light') return 'sun'
+  if (themeStore.mode === 'dark') return 'moon'
+  return 'monitor'
 })
 
-function iconFor(mode: string): IconName {
-  if (mode === 'light') return 'sun'
-  if (mode === 'dark') return 'moon'
+function iconFor(v: string): 'sun' | 'moon' | 'monitor' {
+  if (v === 'light') return 'sun'
+  if (v === 'dark') return 'moon'
   return 'monitor'
 }
 
-function choose(mode: 'light' | 'dark' | 'system'): void {
-  setMode(mode)
-  open.value = false
+function choose(v: 'light' | 'dark' | 'system'): void {
+  themeStore.setMode(v)
 }
 </script>
 
 <template>
-  <div class="theme-switcher">
-    <button
-      class="theme-switcher__trigger"
-      :aria-label="`当前主题：${themeStore.mode}`"
-      @click="open = !open"
-    >
+  <Menu as="div" class="theme-switcher">
+    <MenuButton class="theme-switcher__trigger" :aria-label="`当前外观：${themeStore.mode}`">
       <AppIcon :name="currentIcon" :size="18" />
-    </button>
+    </MenuButton>
 
     <Transition name="dropdown">
-      <div v-if="open" class="theme-switcher__menu glass-floating">
+      <MenuItems class="theme-switcher__menu">
         <p class="theme-switcher__title">外观</p>
-        <button
+        <MenuItem
           v-for="opt in options"
           :key="opt.value"
           class="theme-switcher__item"
@@ -46,12 +48,10 @@ function choose(mode: 'light' | 'dark' | 'system'): void {
           <AppIcon :name="iconFor(opt.value)" :size="16" />
           <span>{{ opt.label }}</span>
           <AppIcon v-if="themeStore.mode === opt.value" name="check" :size="14" />
-        </button>
-      </div>
+        </MenuItem>
+      </MenuItems>
     </Transition>
-
-    <div v-if="open" class="theme-switcher__backdrop" @click="open = false" />
-  </div>
+  </Menu>
 </template>
 
 <style scoped>
@@ -59,12 +59,12 @@ function choose(mode: 'light' | 'dark' | 'system'): void {
   position: relative;
 }
 .theme-switcher__trigger {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
-  width: 38px;
-  height: 38px;
-  border-radius: var(--radius-md);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
   border: 1px solid var(--border-default);
   background: var(--bg-card);
   color: var(--text-secondary);
@@ -79,35 +79,39 @@ function choose(mode: 'light' | 'dark' | 'system'): void {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  z-index: 60;
-  min-width: 160px;
+  z-index: 75;
+  width: 180px;
   padding: 6px;
   border-radius: var(--radius-lg);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: var(--shadow-floating);
 }
 .theme-switcher__title {
+  margin: 0 0 4px;
+  padding: 4px 10px 6px;
   font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   color: var(--text-muted);
-  padding: 6px 10px;
 }
 .theme-switcher__item {
   display: flex;
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 9px 10px;
+  padding: 8px 10px;
   border: none;
   border-radius: var(--radius-md);
   background: transparent;
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: 13px;
   cursor: pointer;
-  text-align: left;
   transition: all var(--duration-fast) var(--ease-standard);
 }
 .theme-switcher__item:hover {
-  background: var(--bg-secondary);
+  background: var(--bg-card);
   color: var(--text-primary);
 }
 .theme-switcher__item.is-active {
@@ -115,10 +119,17 @@ function choose(mode: 'light' | 'dark' | 'system'): void {
 }
 .theme-switcher__item span {
   flex: 1;
+  text-align: left;
 }
-.theme-switcher__backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 55;
+.dropdown-enter-active,
+.dropdown-leave-active {
+  transition:
+    opacity 0.16s var(--ease-standard),
+    transform 0.16s var(--ease-standard);
+}
+.dropdown-enter-from,
+.dropdown-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
 }
 </style>

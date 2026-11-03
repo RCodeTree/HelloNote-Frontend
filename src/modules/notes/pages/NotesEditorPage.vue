@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router'
+import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/vue'
 import { storeToRefs } from 'pinia'
 import { useNotesStore } from '../stores/notes.store'
 import type { NoteCreatePayload, NoteFormat, Tag } from '../types/notes.types'
@@ -191,7 +192,6 @@ function togglePinLocal(): void {
 
 // —— 导出笔记到本地：生成文件 → Blob → 浏览器原生「另存为」对话框（用户自行选择保存路径） ——
 type ExportFormat = 'md' | 'html' | 'txt'
-const exportOpen = ref(false)
 const exportFormats: { value: ExportFormat; label: string; ext: string; mime: string }[] = [
   { value: 'md', label: 'Markdown (.md)', ext: 'md', mime: 'text/markdown' },
   { value: 'html', label: 'HTML 网页 (.html)', ext: 'html', mime: 'text/html' },
@@ -256,7 +256,6 @@ function exportNote(fmt: ExportFormat): void {
   a.click()
   document.body.removeChild(a)
   URL.revokeObjectURL(url)
-  exportOpen.value = false
   toast.success(`已导出：${filename}`)
 }
 
@@ -265,18 +264,12 @@ async function handleCreateTag(name: string): Promise<Tag | null> {
   return store.addTag(name)
 }
 
-// —— 笔记切换下拉 ——
-const menuOpen = ref(false)
-
+// —— 笔记切换下拉（基于 Headless UI Menu：自动处理展开/收起、键盘导航与点击外部关闭） ——
 function switchTo(id: number): void {
-  menuOpen.value = false
-  exportOpen.value = false
   if (id !== noteId.value) void router.push(`/notes/${id}/edit`)
 }
 
 function goCreate(): void {
-  menuOpen.value = false
-  exportOpen.value = false
   if (!isEdit.value) return
   void router.push('/notes/new')
 }
@@ -451,19 +444,19 @@ function formatDate(value: string | undefined): string {
         <span class="editor__divider" />
 
         <!-- 笔记切换下拉：展示当前笔记，可直接选择其他笔记编辑 -->
-        <div class="switcher">
-          <button class="switcher__trigger" @click="menuOpen = !menuOpen">
+        <Menu v-slot="{ open }" as="div" class="switcher">
+          <MenuButton class="switcher__trigger">
             <span class="switcher__title">{{ isEdit ? current?.title || '加载中…' : '新建笔记' }}</span>
-            <AppIcon name="chevron-down" :size="14" class="switcher__chevron" :class="{ 'is-open': menuOpen }" />
-          </button>
+            <AppIcon name="chevron-down" :size="14" class="switcher__chevron" :class="{ 'is-open': open }" />
+          </MenuButton>
           <Transition name="pop">
-            <div v-if="menuOpen" class="switcher__menu">
-              <button class="switcher__item switcher__item--create" @click="goCreate">
+            <MenuItems class="switcher__menu">
+              <MenuItem class="switcher__item switcher__item--create" @click="goCreate">
                 <AppIcon name="plus" :size="15" />
                 <span>新建笔记</span>
-              </button>
+              </MenuItem>
               <div v-if="notes.length" class="switcher__list">
-                <button
+                <MenuItem
                   v-for="n in notes"
                   :key="n.id"
                   class="switcher__item"
@@ -472,13 +465,12 @@ function formatDate(value: string | undefined): string {
                 >
                   <AppIcon v-if="n.isPinned" name="pin" :size="13" class="switcher__pin" />
                   <span class="switcher__item-title">{{ n.title || '（无标题）' }}</span>
-                </button>
+                </MenuItem>
               </div>
               <p v-else class="switcher__empty">暂无其他笔记</p>
-            </div>
+            </MenuItems>
           </Transition>
-          <div v-if="menuOpen" class="switcher__backdrop" @click="menuOpen = false" />
-        </div>
+        </Menu>
       </div>
 
       <div class="editor__topbar-right">
@@ -487,31 +479,28 @@ function formatDate(value: string | undefined): string {
           {{ saveState }}
         </span>
         <!-- 导出笔记：下拉选择格式，触发浏览器原生「另存为」对话框（可选本地保存路径） -->
-        <div class="editor__export">
-          <button
-            v-if="isEdit"
+        <Menu v-if="isEdit" v-slot="{ open }" as="div" class="editor__export">
+          <MenuButton
             class="editor__iconbtn"
-            :class="{ 'is-active': exportOpen }"
+            :class="{ 'is-active': open }"
             title="导出笔记到本地"
-            @click="exportOpen = !exportOpen"
           >
             <AppIcon name="download" :size="17" />
-          </button>
+          </MenuButton>
           <Transition name="pop">
-            <div v-if="exportOpen" class="export__menu">
+            <MenuItems class="export__menu">
               <p class="export__title">导出为</p>
-              <button
+              <MenuItem
                 v-for="f in exportFormats"
                 :key="f.value"
                 class="export__item"
                 @click="exportNote(f.value)"
               >
                 {{ f.label }}
-              </button>
-            </div>
+              </MenuItem>
+            </MenuItems>
           </Transition>
-          <div v-if="exportOpen" class="export__backdrop" @click="exportOpen = false" />
-        </div>
+        </Menu>
         <button
           v-if="isEdit"
           class="editor__iconbtn"
@@ -683,14 +672,9 @@ function formatDate(value: string | undefined): string {
 .editor__iconbtn--danger:hover {
   color: var(--danger);
 }
-/* 导出：相对定位容器 + 下拉菜单（玻璃浮层）+ 点击空白关闭的遮罩 */
+/* 导出：相对定位容器 + 下拉菜单（玻璃浮层，Headless UI Menu 自带点击外部关闭） */
 .editor__export {
   position: relative;
-}
-.export__backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 70;
 }
 .export__menu {
   position: absolute;
@@ -799,11 +783,6 @@ function formatDate(value: string | undefined): string {
   border: 1px solid var(--border-default);
   background: var(--bg-card);
   box-shadow: var(--shadow-floating);
-}
-.switcher__backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 70;
 }
 .switcher__list {
   display: flex;
