@@ -41,6 +41,7 @@ function choose(v: 'light' | 'dark' | 'system'): void {
         <MenuItem
           v-for="opt in options"
           :key="opt.value"
+          as="button"
           class="theme-switcher__item"
           :class="{ 'is-active': themeStore.mode === opt.value }"
           @click="choose(opt.value)"

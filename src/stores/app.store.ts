@@ -16,14 +16,6 @@ export const useAppStore = defineStore('app', () => {
   const autoCollapsed = ref<boolean>(false)
   // 移动端抽屉开关（手动）
   const mobileOpen = ref<boolean>(false)
-  // 「编辑资料」弹窗开关：由侧栏菜单触发，DefaultLayout 挂载唯一的 ProfileDialog 实例
-  const profileOpen = ref<boolean>(false)
-  function openProfile(): void {
-    profileOpen.value = true
-  }
-  function closeProfile(): void {
-    profileOpen.value = false
-  }
 
   // 实际生效模式：移动端走抽屉（视为 full 布局）；中屏把 full 降级为 rail
   const effectiveMode = computed<SidebarMode>(() => {
@@ -82,8 +74,5 @@ export const useAppStore = defineStore('app', () => {
     toggleMobile,
     closeMobile,
     initResponsive,
-    profileOpen,
-    openProfile,
-    closeProfile,
   }
 })

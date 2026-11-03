@@ -451,7 +451,7 @@ function formatDate(value: string | undefined): string {
           </MenuButton>
           <Transition name="pop">
             <MenuItems class="switcher__menu">
-              <MenuItem class="switcher__item switcher__item--create" @click="goCreate">
+              <MenuItem as="button" class="switcher__item switcher__item--create" @click="goCreate">
                 <AppIcon name="plus" :size="15" />
                 <span>新建笔记</span>
               </MenuItem>
@@ -459,6 +459,7 @@ function formatDate(value: string | undefined): string {
                 <MenuItem
                   v-for="n in notes"
                   :key="n.id"
+                  as="button"
                   class="switcher__item"
                   :class="{ 'is-active': n.id === noteId }"
                   @click="switchTo(n.id)"
@@ -493,6 +494,7 @@ function formatDate(value: string | undefined): string {
               <MenuItem
                 v-for="f in exportFormats"
                 :key="f.value"
+                as="button"
                 class="export__item"
                 @click="exportNote(f.value)"
               >
