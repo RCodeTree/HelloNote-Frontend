@@ -19,7 +19,7 @@ export const routes: RouteRecordRaw[] = [
     path: '/dashboard',
     name: 'dashboard',
     component: () => import('@/modules/dashboard/pages/DashboardPage.vue'),
-    meta: { title: '面板', layout: 'default', requiresAuth: true },
+    meta: { title: '面板', layout: 'default', requiresAuth: true, wide: true },
   },
   {
     path: '/notes',

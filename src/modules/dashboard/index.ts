@@ -1,3 +1,8 @@
 export { default as DashboardPage } from './pages/DashboardPage.vue'
 export { useDashboardStore } from './stores/dashboard.store'
+export { useDashboard } from './composables/useDashboard'
+export { useActivityTracker } from './composables/useActivityTracker'
+export { default as ActivityTimeCard } from './components/ActivityTimeCard.vue'
+export { default as ActivityCalendar } from './components/ActivityCalendar.vue'
+export { default as ActivityHeatmap } from './components/ActivityHeatmap.vue'
 export type * from './types/dashboard.types'

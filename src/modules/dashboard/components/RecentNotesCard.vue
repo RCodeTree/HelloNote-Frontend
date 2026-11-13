@@ -17,10 +17,11 @@ defineProps<{
       <span class="panel__count font-mono">{{ loading ? '—' : notes.length }}</span>
     </header>
 
-    <div v-if="loading" class="panel__list">
+    <!-- 独立滚动区域：笔记较多时仅此列表滚动，不影响页面其它区域 -->
+    <div v-if="loading" class="panel__list is-scroll">
       <SkeletonCard v-for="i in 3" :key="i" :lines="2" />
     </div>
-    <div v-else-if="notes.length" class="panel__list">
+    <div v-else-if="notes.length" class="panel__list is-scroll">
       <NoteCardItem v-for="n in notes" :key="n.id" :note="n" />
     </div>
     <EmptyState v-else title="还没有笔记" description="开始写下你的第一篇吧。" />
@@ -36,13 +37,14 @@ defineProps<{
   box-shadow: var(--shadow-card);
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--space-4);
 }
 .panel__head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-3);
+  flex-shrink: 0;
 }
 .panel__title {
   font-size: 18px;
@@ -52,13 +54,23 @@ defineProps<{
   color: var(--text-muted);
 }
 .panel__list {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 0;
 }
-@media (max-width: 560px) {
-  .panel__list {
-    grid-template-columns: 1fr;
-  }
+/* 独立滚动：固定最大高度，内容溢出时仅此列表内部滚动 */
+.panel__list.is-scroll {
+  max-height: 420px;
+  overflow-y: auto;
+  padding-right: 6px;
+  scrollbar-width: thin;
+}
+.panel__list.is-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.panel__list.is-scroll::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: var(--radius-full);
 }
 </style>

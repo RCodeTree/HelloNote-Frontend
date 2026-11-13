@@ -5,9 +5,13 @@ import DefaultLayout from '@/layouts/DefaultLayout.vue'
 import BlankLayout from '@/layouts/BlankLayout.vue'
 import AppToast from '@/components/feedback/AppToast.vue'
 import { useAppStore } from '@/stores/app.store'
+import { useActivityTracker } from '@/modules/dashboard/composables/useActivityTracker'
 
 const route = useRoute()
 const appStore = useAppStore()
+
+// 全局活跃时长心跳：覆盖所有登录态页面（含编辑器），为面板「活动时长」累计数据
+useActivityTracker()
 
 const layouts = { default: DefaultLayout, blank: BlankLayout }
 const layoutComponent = computed(

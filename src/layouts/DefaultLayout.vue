@@ -9,6 +9,8 @@ const route = useRoute()
 // fullBleed 路由（如笔记编辑器）不受内容区最大宽度与内边距限制，
 // 由页面自己控制布局，占满侧栏以外的全部区域。
 const fullBleed = computed(() => route.meta.fullBleed === true)
+// wide 路由（如三列面板）：保留内边距，仅放宽内容区最大宽度
+const wide = computed(() => route.meta.wide === true)
 </script>
 
 <template>
@@ -18,7 +20,10 @@ const fullBleed = computed(() => route.meta.fullBleed === true)
       <div class="app-shell__topbar">
         <TopbarActions />
       </div>
-      <div class="app-shell__content" :class="{ 'app-shell__content--full': fullBleed }">
+      <div
+        class="app-shell__content"
+        :class="{ 'app-shell__content--full': fullBleed, 'app-shell__content--wide': wide }"
+      >
         <slot />
       </div>
     </div>
@@ -50,6 +55,10 @@ const fullBleed = computed(() => route.meta.fullBleed === true)
   max-width: 1200px;
   margin: 0 auto;
   padding: var(--space-6) var(--space-6) var(--space-8);
+}
+/* 宽内容区：三列面板需要更多横向空间容纳日历与热力图 */
+.app-shell__content--wide {
+  max-width: 1600px;
 }
 /* 全幅页面：编辑器自己管理布局与滚动 */
 .app-shell__content--full {

@@ -36,7 +36,7 @@ defineProps<{
   box-shadow: var(--shadow-card);
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--space-4);
 }
 .panel__head {
   display: flex;

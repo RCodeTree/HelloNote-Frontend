@@ -36,6 +36,11 @@ import {
   PanelLeft,
   PanelLeftClose,
   Download,
+  CalendarDays,
+  Clock3,
+  Flame,
+  Activity as ActivityIcon,
+  TrendingUp,
 } from 'lucide-vue-next'
 import type { Component } from 'vue'
 
@@ -76,6 +81,11 @@ export type IconName =
   | 'layout-rail'
   | 'layout-hidden'
   | 'download'
+  | 'calendar'
+  | 'clock'
+  | 'flame'
+  | 'activity'
+  | 'trending-up'
 
 const props = withDefaults(
   defineProps<{
@@ -126,6 +136,11 @@ const iconMap: Record<IconName, Component> = {
   'layout-rail': PanelLeft,
   'layout-hidden': PanelLeftClose,
   download: Download,
+  calendar: CalendarDays,
+  clock: Clock3,
+  flame: Flame,
+  activity: ActivityIcon,
+  'trending-up': TrendingUp,
 }
 
 const Icon = iconMap[props.name]
