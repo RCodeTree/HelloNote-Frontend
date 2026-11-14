@@ -157,7 +157,6 @@ watch(
       <span class="heatmap__legend-label">少</span>
       <span v-for="l in 5" :key="l" class="heatmap__cell is-static" :class="`is-l${l - 1}`" />
       <span class="heatmap__legend-label">多</span>
-      <span class="heatmap__legend-hint">颜色越深，当日笔记操作越频繁</span>
     </footer>
 
     <!-- 悬浮详情 -->
@@ -331,10 +330,6 @@ watch(
   width: 12px;
   height: 12px;
   cursor: default;
-}
-.heatmap__legend-hint {
-  margin-left: auto;
-  opacity: 0.8;
 }
 .heatmap__empty {
   padding: var(--space-8) 0;
