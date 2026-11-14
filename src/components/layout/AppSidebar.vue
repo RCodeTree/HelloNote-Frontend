@@ -197,11 +197,19 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
 </template>
 
 <style scoped>
+/* ===== 统一布局模型 =====
+   sidebar 全态使用 fixed，不再在「sticky 停靠 / fixed 悬浮」之间切换：
+   position 不可过渡，两种定位互切必然硬跳（这也是模式恢复没有动画的根因）。
+   改为由一组可过渡的几何属性区分形态：top / left / bottom / width /
+   border-radius / box-shadow / transform；文档流让位交给 DefaultLayout 里
+   宽度同样带过渡的占位元素。于是「悬浮 → 停靠」恢复、「停靠 → 悬浮」收起、
+   full ↔ rail 都能整体连续动画，而不是瞬间重排。 */
 .sidebar {
-  position: sticky;
+  position: fixed;
   top: 0;
-  align-self: flex-start;
-  height: 100vh;
+  left: 0;
+  bottom: 0;
+  height: auto; /* 由 top/bottom 撑开：悬浮态改 top/bottom 后高度随之收缩 */
   width: 240px;
   flex-shrink: 0;
   display: flex;
@@ -209,43 +217,59 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
   gap: var(--space-4);
   padding: var(--space-4);
   background: var(--bg-card);
-  border-right: 1px solid var(--border-default);
+  /* 四边固定 1px 边框：停靠态仅右边着色，悬浮态四边着色。
+     只过渡 border-color，线宽恒定不跳动；背景按 border-box 铺满边框区域，
+     透明边下仍然是 --bg-card，不会产生细缝。 */
+  border: 1px solid transparent;
+  border-right-color: var(--border-default);
+  border-radius: 0;
+  box-shadow: none;
+  transform: translateX(0);
+  visibility: visible;
   /* 不使用 backdrop-filter：背景本就是不透明白/深色，模糊无视觉作用；
-     且它与抽屉/hidden 的 transform 过渡叠加会造成合成层撕裂（中间出现竖线硬切）。 */
-  transition: width var(--duration-base) var(--ease-standard);
+     且它与 transform 过渡叠加会造成合成层撕裂（中间出现竖线硬切）。 */
+  transition:
+    top var(--duration-base) var(--ease-emphasized),
+    left var(--duration-base) var(--ease-emphasized),
+    bottom var(--duration-base) var(--ease-emphasized),
+    width var(--duration-base) var(--ease-emphasized),
+    border-color var(--duration-base) var(--ease-standard),
+    border-radius var(--duration-base) var(--ease-standard),
+    box-shadow var(--duration-base) var(--ease-standard),
+    transform var(--duration-base) var(--ease-emphasized),
+    visibility var(--duration-base) var(--ease-emphasized);
   z-index: 40;
 }
-/* 真半屏（仅图标） */
+/* 真半屏（仅图标）：仅宽度变化，同样走过渡 */
 .sidebar--collapsed {
   width: 76px;
 }
-/* 全屏收起（自动隐藏）：脱离文档流，内容区占满；鼠标靠近左缘时滑入弹出。
-   悬浮卡片形态：四边离屏幕留白、整圈圆角与浮层阴影，不再贴边直角。
-   仅用 transform 位移 + visibility 显隐，不做 opacity 淡入淡出：
-   半透明会让背后页面内容透出，在过渡中形成分界；visibility 是离散属性，
-   进入 instant 生效、退出在过渡结束时生效，不影响滑入滑出的连贯性。
-   收起位移需把「留白 + 卡片宽」一起移出视口，避免圆角/阴影在边缘露出一角。 */
-.sidebar--hidden {
-  position: fixed;
+
+/* ===== 悬浮卡片：大屏自动隐藏 + 小型设备抽屉共用 =====
+   四边离屏留白、整圈圆角与浮层阴影。呼出/收起仅用 transform 位移 +
+   visibility 显隐，不做 opacity 淡入淡出：半透明会让背后内容透出形成分界；
+   visibility 是离散属性，进入 instant 生效、退出在过渡结束时生效，
+   不影响滑入滑出的连贯性。收起位移把「留白 + 卡片宽」一起移出视口，
+   避免圆角 / 阴影在屏幕边缘露出一角。 */
+.sidebar--hidden,
+.sidebar--mobile {
   top: var(--space-4);
   left: var(--space-4);
   bottom: var(--space-4);
-  height: auto; /* 由 top/bottom 撑开，覆盖基础 100vh */
-  align-self: auto; /* 清除基础 .sidebar 的 flex-start，否则 fixed 元素按内容收缩，
-                       上下留白撑不开（会变成只有 377px 的半截卡片） */
-  width: 240px;
-  border: 1px solid var(--border-default); /* 整圈边框，悬浮卡片 */
+  border-color: var(--border-default);
   border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-floating);
   transform: translateX(calc(-100% - var(--space-4) - var(--space-4)));
   visibility: hidden;
-  transition: transform var(--duration-base) var(--ease-emphasized),
-    visibility var(--duration-base) var(--ease-emphasized);
-  will-change: transform;
-  box-shadow: var(--shadow-floating);
 }
-.sidebar--hidden.is-peek {
+.sidebar--hidden.is-peek,
+.sidebar--mobile.is-open {
   transform: translateX(0);
   visibility: visible;
+}
+/* 大屏自动隐藏：卡片固定 240px，收起时占位宽度归 0，内容区占满全屏 */
+.sidebar--hidden {
+  width: 240px;
 }
 
 /* 自动隐藏模式下贴近左缘的悬浮感应区（隐形，占满高度）。
@@ -428,7 +452,9 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
   transform: scale(0.92);
 }
 
-/* 中小屏：抽屉 + 遮罩（入口为布局壳顶栏左上角的汉堡按钮） */
+/* 小型设备：遮罩 + 悬浮抽屉（入口为布局壳顶栏左上角的汉堡按钮）。
+   卡片形态由上面的 .sidebar--mobile 共用规则提供：四边留白、圆角、浮层阴影，
+   呼出/收起均为 translateX 过渡，与大屏自动隐藏保持一致。 */
 .sidebar-backdrop {
   position: fixed;
   inset: 0;
@@ -436,22 +462,13 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
   background: rgba(0, 0, 0, 0.4);
 }
 .sidebar--mobile {
-  position: fixed;
-  top: 0;
-  left: 0;
-  height: 100vh;
-  width: 264px;
+  width: min(264px, calc(100vw - var(--space-4) - var(--space-4)));
   z-index: 65;
-  transform: translateX(-100%);
-  transition: transform var(--duration-base) var(--ease-standard);
-  box-shadow: var(--shadow-floating);
-}
-.sidebar--mobile.is-open {
-  transform: translateX(0);
 }
 
 /* 尊重系统「减少动态效果」偏好 */
 @media (prefers-reduced-motion: reduce) {
+  .sidebar,
   .sidebar__indicator,
   .sidebar__link,
   .sidebar__link-icon,
