@@ -99,16 +99,6 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
 </script>
 
 <template>
-  <!-- 中小屏：侧边垂直居中悬浮小箭头，点击弹出侧栏抽屉；空闲时低调无高亮 -->
-  <button
-    v-if="isMobile && !mobileOpen"
-    class="sidebar-midbtn"
-    aria-label="打开菜单"
-    @click="app.toggleMobile"
-  >
-    <AppIcon name="chevron-right" :size="18" />
-  </button>
-
   <!-- 大屏「自动隐藏」：贴近左缘的悬浮感应区，鼠标靠近自动弹出侧栏 -->
   <div
     v-if="!isMobile && effectiveMode === 'hidden'"
@@ -230,15 +220,23 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
   width: 76px;
 }
 /* 全屏收起（自动隐藏）：脱离文档流，内容区占满；鼠标靠近左缘时滑入弹出。
+   悬浮卡片形态：四边离屏幕留白、整圈圆角与浮层阴影，不再贴边直角。
    仅用 transform 位移 + visibility 显隐，不做 opacity 淡入淡出：
    半透明会让背后页面内容透出，在过渡中形成分界；visibility 是离散属性，
-   进入 instant 生效、退出在过渡结束时生效，不影响滑入滑出的连贯性。 */
+   进入 instant 生效、退出在过渡结束时生效，不影响滑入滑出的连贯性。
+   收起位移需把「留白 + 卡片宽」一起移出视口，避免圆角/阴影在边缘露出一角。 */
 .sidebar--hidden {
   position: fixed;
-  top: 0;
-  left: 0;
+  top: var(--space-4);
+  left: var(--space-4);
+  bottom: var(--space-4);
+  height: auto; /* 由 top/bottom 撑开，覆盖基础 100vh */
+  align-self: auto; /* 清除基础 .sidebar 的 flex-start，否则 fixed 元素按内容收缩，
+                       上下留白撑不开（会变成只有 377px 的半截卡片） */
   width: 240px;
-  transform: translateX(-104%);
+  border: 1px solid var(--border-default); /* 整圈边框，悬浮卡片 */
+  border-radius: var(--radius-xl);
+  transform: translateX(calc(-100% - var(--space-4) - var(--space-4)));
   visibility: hidden;
   transition: transform var(--duration-base) var(--ease-emphasized),
     visibility var(--duration-base) var(--ease-emphasized);
@@ -250,12 +248,14 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
   visibility: visible;
 }
 
-/* 自动隐藏模式下贴近左缘的悬浮感应区（隐形，占满高度） */
+/* 自动隐藏模式下贴近左缘的悬浮感应区（隐形，占满高度）。
+   宽度需覆盖悬浮卡片的左侧留白（16px）再多一点，否则鼠标从卡片移向
+   屏幕边缘时会先离开卡片、又没进入感应区，导致「收起→立刻弹出」的抖动。 */
 .sidebar-edgezone {
   position: fixed;
   top: 0;
   left: 0;
-  width: 10px;
+  width: calc(var(--space-4) + 12px);
   height: 100vh;
   z-index: 40;
 }
@@ -428,34 +428,7 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
   transform: scale(0.92);
 }
 
-/* 中小屏：侧边垂直居中悬浮小箭头 —— 默认低调、空闲无高亮，hover 才点亮 */
-.sidebar-midbtn {
-  position: fixed;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 65;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 46px;
-  border: none;
-  border-radius: 0 var(--radius-md) var(--radius-md) 0;
-  background: var(--bg-secondary);
-  color: var(--text-muted);
-  cursor: pointer;
-  opacity: 0.5;
-  transition: all var(--duration-fast) var(--ease-standard);
-}
-.sidebar-midbtn:hover {
-  opacity: 1;
-  color: var(--accent-primary);
-  background: var(--bg-card);
-  box-shadow: var(--shadow-card);
-}
-
-/* 中小屏：抽屉 + 遮罩（导航入口为侧边中部悬浮小箭头） */
+/* 中小屏：抽屉 + 遮罩（入口为布局壳顶栏左上角的汉堡按钮） */
 .sidebar-backdrop {
   position: fixed;
   inset: 0;
