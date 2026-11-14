@@ -220,7 +220,8 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
   padding: var(--space-4);
   background: var(--bg-card);
   border-right: 1px solid var(--border-default);
-  backdrop-filter: blur(8px);
+  /* 不使用 backdrop-filter：背景本就是不透明白/深色，模糊无视觉作用；
+     且它与抽屉/hidden 的 transform 过渡叠加会造成合成层撕裂（中间出现竖线硬切）。 */
   transition: width var(--duration-base) var(--ease-standard);
   z-index: 40;
 }
@@ -228,22 +229,25 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
 .sidebar--collapsed {
   width: 76px;
 }
-/* 全屏收起（自动隐藏）：脱离文档流，内容区占满；鼠标靠近左缘时滑入弹出 */
+/* 全屏收起（自动隐藏）：脱离文档流，内容区占满；鼠标靠近左缘时滑入弹出。
+   仅用 transform 位移 + visibility 显隐，不做 opacity 淡入淡出：
+   半透明会让背后页面内容透出，在过渡中形成分界；visibility 是离散属性，
+   进入 instant 生效、退出在过渡结束时生效，不影响滑入滑出的连贯性。 */
 .sidebar--hidden {
   position: fixed;
   top: 0;
   left: 0;
   width: 240px;
   transform: translateX(-104%);
-  opacity: 0;
+  visibility: hidden;
   transition: transform var(--duration-base) var(--ease-emphasized),
-    opacity var(--duration-base) var(--ease-emphasized);
-  will-change: transform, opacity;
+    visibility var(--duration-base) var(--ease-emphasized);
+  will-change: transform;
   box-shadow: var(--shadow-floating);
 }
 .sidebar--hidden.is-peek {
   transform: translateX(0);
-  opacity: 1;
+  visibility: visible;
 }
 
 /* 自动隐藏模式下贴近左缘的悬浮感应区（隐形，占满高度） */
