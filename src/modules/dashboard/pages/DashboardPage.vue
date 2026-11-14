@@ -104,8 +104,6 @@ const activitySummary = computed(() => activity.value?.summary ?? null)
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
-  /* 撑满内容区可用高度（顶栏 + 内容区上下内边距 ≈ 104px） */
-  min-height: calc(100dvh - 104px);
 }
 .dashboard-page__tools {
   display: flex;
@@ -148,10 +146,9 @@ const activitySummary = computed(() => activity.value?.summary ?? null)
   display: grid;
   grid-template-columns: minmax(240px, 288px) minmax(0, 1fr) minmax(280px, 340px);
   gap: var(--space-5); /* 列间外边距 */
-  align-items: start;   /* 小屏保持自然高度 */
-  align-content: stretch; /* 宽屏下让唯一的 auto 行撑满容器高度，三列才能等高 */
-  flex: 1;              /* 撑满页面，交给各列分配 */
-  min-height: 0;
+  /* 不再做「三列等高 + 拉伸铺满」：每列按内容自然高度堆叠，
+     避免把日历格子、统计卡拉成畸形的大空块。 */
+  align-items: start;
 }
 .db-col {
   display: flex;
@@ -160,16 +157,16 @@ const activitySummary = computed(() => activity.value?.summary ?? null)
   min-width: 0;
 }
 
-/* 左列统计卡 2×2 */
+/* 左列统计卡 2×2：固定紧凑高度，内容自然居中，不再被拉伸成大空卡 */
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-4);
 }
-/* 窄栏下统计卡改竖排、缩小图标，避免拥挤 */
 .stat-grid :deep(.stat-card) {
   flex-direction: column;
   align-items: flex-start;
+  justify-content: center;
   gap: var(--space-2);
   padding: var(--space-4);
 }
@@ -181,28 +178,13 @@ const activitySummary = computed(() => activity.value?.summary ?? null)
   font-size: 22px;
 }
 
-/* 桌面宽屏：三列等高铺满。每列指定一个「可放大实心块」吸收剩余高度——
-   卡片/格子/列表本身变大，不产生卡片内部空洞。 */
+/* 桌面宽屏：左/中列保持自然高度（不拉伸，避免格子/卡片畸形）。
+   仅右列「最近笔记」这一张列表卡填满行高——多出的空间由更多笔记内容 +
+   独立滚动占据，不产生空洞；行高仍由左/中列决定，右列不会反向撑高页面。 */
 @media (min-width: 1181px) {
-  .dashboard-grid {
-    align-items: stretch;
+  .db-col--right {
+    align-self: stretch;
   }
-  /* 左列：4 张统计卡均分剩余高度，内容垂直居中 */
-  .stat-grid {
-    flex: 1 1 auto;
-    min-height: 0;
-    grid-template-rows: repeat(2, minmax(0, 1fr));
-  }
-  .stat-grid :deep(.stat-card) {
-    height: 100%;
-    justify-content: center;
-  }
-  /* 中列：日历网格行均分放大 */
-  .db-center-calendar {
-    flex: 1 1 auto;
-    min-height: 0;
-  }
-  /* 右列：最近笔记独占整列，卡片与列表一起铺满（列表独立滚动） */
   .db-right-notes {
     flex: 1 1 auto;
     min-height: 0;

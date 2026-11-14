@@ -55,3 +55,29 @@
   --shadow-card: 0 4px 16px rgba(0, 0, 0, 0.16);
   --shadow-floating: 0 12px 32px rgba(0, 0, 0, 0.3);
 }
+
+/* ============================================================
+   主题切换平滑过渡
+   由 theme.store 在切换时给 <html> 短暂挂载 `.theme-transitioning`，
+   结束后自动移除——平时不生效，不影响任何 hover / 布局动画。
+   只过渡颜色类属性，不含 transform / width，避免抖动；
+   不使用 !important：组件 scoped 样式里已声明的 transition 优先级更高，
+   会保留自身行为（且通常也包含 color / background-color，同样平滑）。
+   ============================================================ */
+html.theme-transitioning,
+html.theme-transitioning *,
+html.theme-transitioning *::before,
+html.theme-transitioning *::after {
+  transition-property: background-color, border-color, color, box-shadow, fill, stroke, outline-color;
+  transition-duration: 300ms;
+  transition-timing-function: var(--ease-standard);
+  transition-delay: 0ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  html.theme-transitioning,
+  html.theme-transitioning *,
+  html.theme-transitioning *::before,
+  html.theme-transitioning *::after {
+    transition-duration: 0.01ms;
+  }
+}

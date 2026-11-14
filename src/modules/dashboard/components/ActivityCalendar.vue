@@ -684,10 +684,9 @@ onBeforeUnmount(() => {
   gap: 6px;
 }
 .calendar__grid {
-  /* 卡片被外层拉伸铺满时，6 行均分可用高度；自然高度时每行保持 42px 下限 */
-  flex: 1 1 auto;
-  min-height: 0;
-  grid-template-rows: repeat(6, minmax(42px, 1fr));
+  /* 固定 6 行 × 46px：格子保持规整方块，切换月份高度稳定，
+     不再随外层拉伸被拉成竖长条。 */
+  grid-template-rows: repeat(6, 46px);
 }
 .calendar__weekday {
   text-align: center;
@@ -698,7 +697,7 @@ onBeforeUnmount(() => {
 .calendar__cell {
   position: relative;
   width: 100%;
-  min-height: 42px; /* 高度交由网格行 1fr 分配，铺满时随之变大 */
+  height: 46px;
   border-radius: var(--radius-sm);
   background: var(--bg-secondary);
   border: 1px solid transparent;

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useAppStore, type SidebarMode } from '@/stores/app.store'
@@ -20,12 +20,17 @@ interface NavItem {
   to: string
   label: string
   icon: IconName
+  active: (path: string) => boolean
 }
 
 const navItems: NavItem[] = [
-  { to: '/', label: '首页', icon: 'home' },
-  { to: '/dashboard', label: '面板', icon: 'grid' },
+  { to: '/', label: '首页', icon: 'home', active: (p) => p === '/' },
+  { to: '/dashboard', label: '面板', icon: 'grid', active: (p) => p === '/dashboard' },
+  { to: '/notes', label: '笔记', icon: 'note', active: (p) => p.startsWith('/notes') },
 ]
+
+/** 当前激活项索引；-1 表示当前页面不属于任何导航项（如登录页），此时隐藏指示器 */
+const activeIndex = computed(() => navItems.findIndex((i) => i.active(route.path)))
 
 // 切换侧栏显示模式（full / rail / hidden）
 function setMode(mode: SidebarMode): void {
@@ -49,6 +54,48 @@ function onNavClick(): void {
   app.closeMobile()
   peeking.value = false
 }
+
+/* ===== 激活项滑动指示器 =====
+   独立的高亮块根据激活项的位置平滑移动，替代「旧项淡出 + 新项淡入」的硬切。
+   用实测 offsetTop/offsetHeight 定位，可自适应折叠(rail)/移动端等导致的高度变化。 */
+const navRef = ref<HTMLElement | null>(null)
+const indTop = ref(0)
+const indHeight = ref(0)
+const indVisible = ref(false)
+const indAnimated = ref(false) // 首次定位不加过渡，避免指示器从顶部「飞入」
+let resizeObserver: ResizeObserver | null = null
+
+function syncIndicator(): void {
+  const nav = navRef.value
+  if (!nav) return
+  const links = nav.querySelectorAll<HTMLElement>('.sidebar__link')
+  const el = activeIndex.value >= 0 ? links[activeIndex.value] : undefined
+  if (!el) {
+    indVisible.value = false
+    return
+  }
+  indTop.value = el.offsetTop
+  indHeight.value = el.offsetHeight
+  indVisible.value = true
+}
+
+// 路由 / 侧栏形态变化后重新测量（等 DOM 更新完成）
+watch([activeIndex, sidebarCollapsed, isMobile, effectiveMode, mobileOpen], () => {
+  void nextTick(syncIndicator)
+})
+
+onMounted(() => {
+  void nextTick(() => {
+    syncIndicator()
+    if (navRef.value && typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(() => syncIndicator())
+      resizeObserver.observe(navRef.value)
+    }
+    // 双帧后再启用过渡：保证首屏是无动画就位，之后切换才有滑动
+    requestAnimationFrame(() => requestAnimationFrame(() => (indAnimated.value = true)))
+  })
+})
+onBeforeUnmount(() => resizeObserver?.disconnect())
 </script>
 
 <template>
@@ -97,29 +144,26 @@ function onNavClick(): void {
       </button>
     </div>
 
-    <nav class="sidebar__nav">
+    <nav ref="navRef" class="sidebar__nav">
+      <!-- 滑动高亮块：在导航项之间平滑移动 -->
+      <div
+        class="sidebar__indicator"
+        :class="{ 'is-visible': indVisible, 'is-animated': indAnimated }"
+        :style="{ '--sb-top': `${indTop}px`, '--sb-height': `${indHeight}px` }"
+        aria-hidden="true"
+      />
+
       <RouterLink
         v-for="item in navItems"
         :key="item.to"
         :to="item.to"
         class="sidebar__link"
-        :class="{ 'is-active': route.path === item.to }"
+        :class="{ 'is-active': item.active(route.path) }"
         :title="sidebarCollapsed ? item.label : undefined"
         @click="onNavClick"
       >
-        <AppIcon :name="item.icon" :size="20" class="sidebar__link-icon" />
+        <span class="sidebar__link-icon"><AppIcon :name="item.icon" :size="20" /></span>
         <span class="sidebar__link-label">{{ item.label }}</span>
-      </RouterLink>
-
-      <RouterLink
-        to="/notes"
-        class="sidebar__link"
-        :class="{ 'is-active': route.path.startsWith('/notes') }"
-        :title="sidebarCollapsed ? '笔记' : undefined"
-        @click="onNavClick"
-      >
-        <AppIcon name="note" :size="20" class="sidebar__link-icon" />
-        <span class="sidebar__link-label">笔记</span>
       </RouterLink>
     </nav>
 
@@ -243,13 +287,43 @@ function onNavClick(): void {
   background: var(--bg-secondary);
 }
 .sidebar__nav {
+  position: relative; /* 滑动指示器的定位参照 */
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
   flex: 1;
   min-height: 0;
 }
+
+/* ===== 激活项滑动指示器 ===== */
+.sidebar__indicator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 0;
+  height: var(--sb-height, 0px);
+  transform: translateY(var(--sb-top, 0px));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--accent-primary) 14%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-primary) 8%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  will-change: transform, height;
+}
+.sidebar__indicator.is-visible {
+  opacity: 1;
+}
+.sidebar__indicator.is-animated {
+  transition:
+    transform 340ms var(--ease-emphasized),
+    height 280ms var(--ease-emphasized),
+    opacity var(--duration-base) var(--ease-standard);
+}
+
 .sidebar__link {
+  position: relative;
+  z-index: 1; /* 文字/图标在指示器之上 */
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -259,15 +333,39 @@ function onNavClick(): void {
   text-decoration: none;
   font-size: 14px;
   white-space: nowrap;
-  transition: all var(--duration-fast) var(--ease-standard);
+  /* 明确列出可过渡属性，避免 `all` 影响到由指示器负责的背景 */
+  transition:
+    color var(--duration-base) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
 }
 .sidebar__link:hover {
   background: var(--bg-secondary);
   color: var(--text-primary);
 }
 .sidebar__link.is-active {
-  background: color-mix(in srgb, var(--accent-primary) 14%, transparent);
   color: var(--accent-primary);
+  background: transparent; /* 高亮交给滑动指示器，避免双重背景 */
+}
+.sidebar__link.is-active:hover {
+  background: transparent;
+}
+.sidebar__link:active {
+  transform: scale(0.98); /* 点击轻微回弹反馈 */
+}
+.sidebar__link-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  transition: transform 340ms var(--ease-emphasized);
+}
+.sidebar__link.is-active .sidebar__link-icon {
+  transform: scale(1.08);
+}
+.sidebar__link-label {
+  transition: transform 340ms var(--ease-emphasized);
+}
+.sidebar__link.is-active .sidebar__link-label {
+  transform: translateX(2px);
 }
 .sidebar--collapsed .sidebar__link {
   justify-content: center;
@@ -310,7 +408,9 @@ function onNavClick(): void {
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
-  transition: all var(--duration-fast) var(--ease-standard);
+  transition: color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-emphasized);
 }
 .sidebar__mode:hover {
   color: var(--text-primary);
@@ -319,6 +419,9 @@ function onNavClick(): void {
 .sidebar__mode.is-active {
   color: var(--accent-primary);
   background: var(--bg-card);
+}
+.sidebar__mode:active {
+  transform: scale(0.92);
 }
 
 /* 中小屏：侧边垂直居中悬浮小箭头 —— 默认低调、空闲无高亮，hover 才点亮 */
@@ -368,5 +471,16 @@ function onNavClick(): void {
 }
 .sidebar--mobile.is-open {
   transform: translateX(0);
+}
+
+/* 尊重系统「减少动态效果」偏好 */
+@media (prefers-reduced-motion: reduce) {
+  .sidebar__indicator,
+  .sidebar__link,
+  .sidebar__link-icon,
+  .sidebar__link-label,
+  .sidebar__mode {
+    transition-duration: 0.01ms !important;
+  }
 }
 </style>

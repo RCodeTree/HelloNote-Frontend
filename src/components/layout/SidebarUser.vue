@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/vue'
@@ -17,6 +17,12 @@ const { themeStore, options, setMode } = useTheme()
 
 const { user, isAuthenticated } = storeToRefs(auth)
 const { sidebarCollapsed, isMobile } = storeToRefs(app)
+
+// 激活项索引：驱动分段控件里的滑动指示器（0=浅色 1=深色 2=系统）
+const activeThemeIndex = computed(() => {
+  const i = options.findIndex((o) => o.value === themeStore.mode)
+  return i < 0 ? 0 : i
+})
 
 // 编辑资料弹窗：挂在组件内部，与菜单同生命周期
 const profileOpen = ref(false)
@@ -62,7 +68,9 @@ function handleLogout(): void {
           <!-- 主题切换：普通按钮（非 MenuItem），点击切换主题但不关闭菜单 -->
           <div class="sidebar-user__section">
             <span class="sidebar-user__section-label">主题</span>
-            <div class="sidebar-user__themes">
+            <div class="sidebar-user__themes" :style="{ '--theme-index': activeThemeIndex }">
+              <!-- 滑动高亮块：在三个等宽按钮之间平滑移动 -->
+              <span class="sidebar-user__theme-indicator" aria-hidden="true" />
               <button
                 v-for="opt in options"
                 :key="opt.value"
@@ -70,6 +78,7 @@ function handleLogout(): void {
                 :class="{ 'is-active': themeStore.mode === opt.value }"
                 :title="opt.label"
                 :aria-label="opt.label"
+                :aria-pressed="themeStore.mode === opt.value"
                 @click="setMode(opt.value)"
               >
                 <AppIcon :name="iconFor(opt.value)" :size="16" />
@@ -220,33 +229,67 @@ function handleLogout(): void {
   flex-shrink: 0;
 }
 .sidebar-user__themes {
+  /* 尺寸变量：指示器位置由索引 ×(按钮宽 + 间距) 计算，改尺寸时自动同步 */
+  --theme-btn-w: 30px;
+  --theme-btn-h: 28px;
+  --theme-gap: 4px;
+  --theme-pad: 3px;
+  position: relative;
   display: inline-flex;
-  gap: 4px;
-  padding: 3px;
+  gap: var(--theme-gap);
+  padding: var(--theme-pad);
   border-radius: var(--radius-md);
   background: var(--bg-secondary);
 }
+/* 滑动高亮块：在三个等宽按钮之间平滑移动 */
+.sidebar-user__theme-indicator {
+  position: absolute;
+  top: var(--theme-pad);
+  left: var(--theme-pad);
+  z-index: 0;
+  width: var(--theme-btn-w);
+  height: var(--theme-btn-h);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-card);
+  transform: translateX(calc(var(--theme-index, 0) * (var(--theme-btn-w) + var(--theme-gap))));
+  transition:
+    transform 340ms var(--ease-emphasized),
+    background-color 300ms var(--ease-standard),
+    box-shadow 300ms var(--ease-standard);
+  pointer-events: none;
+}
 .sidebar-user__theme {
+  position: relative;
+  z-index: 1; /* 图标在指示器之上 */
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 28px;
+  width: var(--theme-btn-w);
+  height: var(--theme-btn-h);
   border: none;
   border-radius: var(--radius-sm);
-  background: transparent;
+  background: transparent; /* 高亮交给滑动指示器，避免双重背景 */
   color: var(--text-muted);
   cursor: pointer;
-  transition: all var(--duration-fast) var(--ease-standard);
+  transition:
+    color var(--duration-base) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-emphasized);
 }
 .sidebar-user__theme:hover {
   color: var(--text-primary);
-  background: var(--bg-card);
+}
+.sidebar-user__theme:active {
+  transform: scale(0.9);
 }
 .sidebar-user__theme.is-active {
   color: var(--accent-primary);
-  background: var(--bg-card);
-  box-shadow: var(--shadow-card);
+}
+.sidebar-user__theme.is-active :deep(svg) {
+  transform: scale(1.08);
+}
+.sidebar-user__theme :deep(svg) {
+  transition: transform 340ms var(--ease-emphasized);
 }
 .sidebar-user__divider {
   height: 1px;
@@ -266,5 +309,14 @@ function handleLogout(): void {
 .pop-leave-to {
   opacity: 0;
   transform: translateY(6px);
+}
+
+/* 尊重系统「减少动态效果」偏好 */
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-user__theme-indicator,
+  .sidebar-user__theme,
+  .sidebar-user__theme :deep(svg) {
+    transition-duration: 0.01ms !important;
+  }
 }
 </style>
