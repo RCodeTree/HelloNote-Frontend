@@ -204,11 +204,7 @@ function formatDate(value: string): string {
       </article>
     </div>
 
-    <EmptyState
-      v-else
-      title="还没有笔记"
-      description="点击右上角「新建笔记」，开始记录你的想法。"
-    />
+    <EmptyState v-else title="还没有笔记" />
 
     <!-- 删除确认弹窗 -->
     <ConfirmDialog

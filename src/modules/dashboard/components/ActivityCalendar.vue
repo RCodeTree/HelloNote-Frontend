@@ -359,7 +359,6 @@ onBeforeUnmount(() => {
             <button class="picker__submit" @click="submitInput">跳转</button>
           </div>
           <p v-if="inputError" class="picker__error">{{ inputError }}</p>
-          <p v-else class="picker__hint">支持 YYYY-MM-DD 或 YYYY-MM</p>
 
           <div class="picker__foot">
             <button class="picker__link" @click="goToday">今天</button>
@@ -649,7 +648,6 @@ onBeforeUnmount(() => {
   color: var(--accent-primary);
   border-color: var(--accent-primary);
 }
-.picker__hint,
 .picker__error {
   margin: 0;
   font-size: 11px;

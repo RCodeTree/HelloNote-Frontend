@@ -24,7 +24,7 @@ defineProps<{
     <div v-else-if="notes.length" class="panel__list is-scroll">
       <NoteCardItem v-for="n in notes" :key="n.id" :note="n" />
     </div>
-    <EmptyState v-else title="还没有笔记" description="开始写下你的第一篇吧。" />
+    <EmptyState v-else title="还没有笔记" />
   </section>
 </template>
 

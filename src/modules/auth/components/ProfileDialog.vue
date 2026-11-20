@@ -99,11 +99,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
                 {{ emoji }}
               </button>
             </div>
-            <BaseInput v-model="form.avatarUrl" placeholder="或粘贴头像图片链接（留空使用首字母头像）" />
+            <BaseInput v-model="form.avatarUrl" placeholder="头像链接" />
           </div>
 
-          <BaseInput v-model="form.displayName" label="昵称" placeholder="输入新的昵称" />
-          <p class="profile__hint">用户名 @{{ auth.user?.username }} 不可修改</p>
+          <BaseInput v-model="form.displayName" label="昵称" placeholder="昵称" />
 
           <p v-if="auth.error" class="profile__error">{{ auth.error }}</p>
         </div>
@@ -236,10 +235,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 .profile__emoji.is-active {
   border-color: var(--accent-primary);
   background: color-mix(in srgb, var(--accent-primary) 14%, transparent);
-}
-.profile__hint {
-  font-size: 12px;
-  color: var(--text-muted);
 }
 .profile__error {
   font-size: 13px;

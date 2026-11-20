@@ -12,6 +12,8 @@ const FIELD_LABELS: Record<string, string> = {
   email: '邮箱',
   password: '密码',
   account: '账号',
+  file: '头像',
+  bio: '个人简介',
 }
 
 // 从 Axios 错误中提取可读信息：
@@ -101,11 +103,27 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  // 上传头像：成功后写回当前用户 avatarUrl，失败返回 null
+  async function uploadAvatar(file: File): Promise<string | null> {
+    loading.value = true
+    error.value = null
+    try {
+      const url = await authApi.uploadAvatar(file)
+      if (user.value) user.value.avatarUrl = url
+      return url
+    } catch (e) {
+      error.value = toErrorMessage(e, '头像上传失败，请稍后重试')
+      return null
+    } finally {
+      loading.value = false
+    }
+  }
+
   function logout(): void {
     token.value = null
     user.value = null
     localStorage.removeItem(TOKEN_KEY)
   }
 
-  return { token, user, loading, error, isAuthenticated, login, register, fetchUser, updateProfile, logout }
+  return { token, user, loading, error, isAuthenticated, login, register, fetchUser, updateProfile, uploadAvatar, logout }
 })

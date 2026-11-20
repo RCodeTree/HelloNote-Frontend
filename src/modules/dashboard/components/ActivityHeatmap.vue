@@ -151,7 +151,7 @@ watch(
       </div>
     </div>
 
-    <div v-else class="heatmap__empty">暂无活跃记录，开始记录你的第一篇笔记吧。</div>
+    <div v-else class="heatmap__empty">暂无活跃记录</div>
 
     <footer class="heatmap__legend">
       <span class="heatmap__legend-label">少</span>

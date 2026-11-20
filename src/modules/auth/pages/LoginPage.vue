@@ -61,7 +61,7 @@ async function onSubmit(): Promise<void> {
     <div class="login-card glass-floating">
       <div class="login-card__head">
         <AppLogo :show-text="true" />
-        <p class="login-card__sub">欢迎回来，开始记录你的想法</p>
+        <p class="login-card__sub">欢迎回来</p>
       </div>
 
       <div class="login-tabs">
@@ -86,21 +86,21 @@ async function onSubmit(): Promise<void> {
           <BaseInput
             v-model="loginForm.account"
             label="用户名 / 邮箱"
-            placeholder="demo 或 demo@hellonote.app"
+            placeholder="账号"
             autocomplete="username"
           />
           <BaseInput
             v-model="loginForm.password"
             label="密码"
             type="password"
-            placeholder="请输入密码"
+            placeholder="密码"
             autocomplete="current-password"
           />
         </template>
 
         <template v-else>
-          <BaseInput v-model="registerForm.username" label="用户名" placeholder="3-50 个字符" />
-          <BaseInput v-model="registerForm.displayName" label="昵称" placeholder="展示名称" />
+          <BaseInput v-model="registerForm.username" label="用户名" placeholder="3-50 字符" />
+          <BaseInput v-model="registerForm.displayName" label="昵称" placeholder="昵称" />
           <BaseInput
             v-model="registerForm.email"
             label="邮箱"
@@ -131,7 +131,7 @@ async function onSubmit(): Promise<void> {
       </form>
 
       <p class="login-card__hint">
-        演示账号：<strong>demo</strong> / <strong>demo1234</strong>
+        账号：<strong>demo</strong> / <strong>demo1234</strong>
       </p>
     </div>
   </div>

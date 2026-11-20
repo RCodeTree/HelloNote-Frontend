@@ -47,7 +47,7 @@ onMounted(() => {
           <BaseTag :label="n.tag" :color="n.color" size="sm" />
         </div>
         <p class="preview-panel__item-desc">
-          这是一段示例摘要，用于展示面板中笔记卡片的排版与复古玻璃质感。
+          专注不是一次性的决定，而是一种被反复找回的状态。
         </p>
       </div>
     </div>

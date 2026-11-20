@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/vue'
 import { useAuthStore } from '@/modules/auth'
 import { useTheme } from '@/composables/useTheme'
-import ProfileDialog from '@/modules/auth/components/ProfileDialog.vue'
 import UserAvatar from '@/components/common/UserAvatar.vue'
 import AppIcon, { type IconName } from '@/components/common/AppIcon.vue'
 import { useAppStore } from '@/stores/app.store'
@@ -24,9 +23,6 @@ const activeThemeIndex = computed(() => {
   return i < 0 ? 0 : i
 })
 
-// 编辑资料弹窗：挂在组件内部，与菜单同生命周期
-const profileOpen = ref(false)
-
 function iconFor(mode: string): IconName {
   if (mode === 'light') return 'sun'
   if (mode === 'dark') return 'moon'
@@ -34,7 +30,8 @@ function iconFor(mode: string): IconName {
 }
 
 function openProfile(): void {
-  profileOpen.value = true
+  void router.push('/profile')
+  app.closeMobile()
 }
 
 function handleLogout(): void {
@@ -91,7 +88,7 @@ function handleLogout(): void {
           <!-- MenuItem 必须显式 as="button"：默认 template 无法向多子节点转发 props -->
           <MenuItem as="button" class="sidebar-user__item" @click="openProfile">
             <AppIcon name="user" :size="16" />
-            <span>编辑资料</span>
+            <span>个人中心</span>
           </MenuItem>
 
           <MenuItem as="button" class="sidebar-user__item sidebar-user__item--danger" @click="handleLogout">
@@ -100,8 +97,6 @@ function handleLogout(): void {
           </MenuItem>
         </MenuItems>
       </Transition>
-
-      <ProfileDialog :open="profileOpen" @close="profileOpen = false" />
     </Menu>
 
     <!-- 未登录：登录入口 -->

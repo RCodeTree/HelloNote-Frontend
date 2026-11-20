@@ -6,6 +6,7 @@ export interface RawUser {
   display_name: string
   email: string
   avatar_url: string | null
+  bio: string | null
   is_active: boolean
 }
 
@@ -21,6 +22,7 @@ export interface AuthUser {
   displayName: string
   email: string
   avatarUrl: string | null
+  bio: string | null
   isActive: boolean
 }
 
@@ -40,4 +42,5 @@ export interface UpdateProfilePayload {
   displayName?: string
   /** 传空字符串表示清除头像 */
   avatarUrl?: string | null
+  bio?: string
 }

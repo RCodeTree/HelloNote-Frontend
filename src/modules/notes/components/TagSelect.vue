@@ -91,7 +91,7 @@ function cancelCreate(): void {
         class="tag-select__input"
         type="text"
         maxlength="50"
-        placeholder="标签名，回车确认"
+        placeholder="标签名"
         @input="creatingError = ''"
         @keyup.enter="confirmCreate"
         @keyup.esc="cancelCreate"
@@ -104,7 +104,7 @@ function cancelCreate(): void {
     </button>
 
     <p v-if="creatingError" class="tag-select__error">{{ creatingError }}</p>
-    <p v-else-if="!tags.length && !creating" class="tag-select__empty">暂无标签，点击「新建标签」创建第一个</p>
+    <p v-else-if="!tags.length && !creating" class="tag-select__empty">暂无标签</p>
   </div>
 </template>
 

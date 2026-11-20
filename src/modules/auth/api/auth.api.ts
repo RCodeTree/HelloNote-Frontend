@@ -15,6 +15,7 @@ function mapUser(raw: RawUser): AuthUser { // 将后端返回的 snake_case 映�
     displayName: raw.display_name,
     email: raw.email,
     avatarUrl: raw.avatar_url,
+    bio: raw.bio ?? null,
     isActive: raw.is_active,
   }
 }
@@ -41,11 +42,22 @@ export async function fetchMe(): Promise<AuthUser> {
   return mapUser(data)
 }
 
-// 更新当前用户资料（昵称/头像）；avatarUrl 传空字符串表示清除头像
+// 更新当前用户资料（昵称/简介/头像）；avatarUrl 传空字符串表示清除头像
 export async function updateMe(payload: UpdateProfilePayload): Promise<AuthUser> {
   const body: Record<string, unknown> = {}
   if (payload.displayName !== undefined) body.display_name = payload.displayName
   if (payload.avatarUrl !== undefined) body.avatar_url = payload.avatarUrl ?? ''
+  body.bio = payload.bio ?? ''
   const { data } = await http.patch<RawUser>('/auth/me', body)
   return mapUser(data)
+}
+
+// 上传头像文件（multipart/form-data），返回可访问的头像 URL
+export async function uploadAvatar(file: File): Promise<string> {
+  const formData = new FormData()
+  formData.append('file', file)
+  const { data } = await http.post<{ url: string }>('/upload/avatar', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return data.url
 }

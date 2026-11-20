@@ -563,7 +563,7 @@ function formatDate(value: string | undefined): string {
           ref="contentEl"
           v-model="form.content"
           class="editor__content"
-          placeholder="开始写下你的想法…"
+          placeholder="正文"
           @scroll="onAreaScroll"
         />
         <!-- 预览：Markdown 渲染结果（已转义，防注入）；仅 Markdown 格式可进入 -->
@@ -574,8 +574,6 @@ function formatDate(value: string | undefined): string {
           @scroll="onAreaScroll"
         />
         <p v-if="error" class="editor__error">{{ error }}</p>
-        <!-- 快捷键提示仅编辑态显示：预览态不编辑，提示悬在渲染内容末尾只会干扰阅读 -->
-        <p v-if="!showPreview" class="editor__shortcut">Ctrl / ⌘ + S 快速保存</p>
       </article>
 
       <!-- 底部固定栏：标签编辑（grid 第三行，固定置底，不随内容滚动） -->
@@ -1037,10 +1035,6 @@ function formatDate(value: string | undefined): string {
   font-size: 13px;
   color: var(--danger);
 }
-.editor__shortcut {
-  font-size: 12px;
-  color: var(--text-muted);
-}
 .editor__state-page {
   display: flex;
   flex-direction: column;
@@ -1100,9 +1094,6 @@ function formatDate(value: string | undefined): string {
   .editor__content,
   .editor__preview {
     font-size: 16px; /* ≥16px 防止 iOS 聚焦自动放大 */
-  }
-  .editor__shortcut {
-    display: none; /* 移动端无键盘快捷键意义 */
   }
   .editor__footer {
     padding: 8px 12px;

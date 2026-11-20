@@ -40,6 +40,12 @@ export const routes: RouteRecordRaw[] = [
     meta: { title: '编辑笔记', layout: 'default', requiresAuth: true, fullBleed: true },
   },
   {
+    path: '/profile',
+    name: 'profile',
+    component: () => import('@/modules/auth/pages/ProfilePage.vue'),
+    meta: { title: '个人中心', layout: 'default', requiresAuth: true },
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
     component: () => import('@/modules/home/pages/NotFoundPage.vue'),
