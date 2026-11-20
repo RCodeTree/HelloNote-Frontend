@@ -1,0 +1,72 @@
+import http from '@/services/http/client'
+import type { Friend, FriendBrief } from '../types/friends.types'
+
+// 后端返回 snake_case，这里映射为前端 camelCase 领域模型。
+interface RawFriend {
+  id: number
+  user_id: number
+  username: string | null
+  display_name: string | null
+  avatar_url: string | null
+  bio: string | null
+  status: string
+  is_requester: boolean
+}
+
+interface RawFriendBrief {
+  id: number
+  username: string | null
+  display_name: string | null
+  avatar_url: string | null
+}
+
+function mapFriend(r: RawFriend): Friend {
+  return {
+    id: r.id,
+    userId: r.user_id,
+    username: r.username ?? '',
+    displayName: r.display_name || r.username || '匿名',
+    avatarUrl: r.avatar_url ?? null,
+    bio: r.bio ?? '',
+    status: r.status ?? '',
+    isRequester: !!r.is_requester,
+  }
+}
+
+function mapBrief(r: RawFriendBrief): FriendBrief {
+  return {
+    id: r.id,
+    username: r.username ?? '',
+    displayName: r.display_name || r.username || '匿名',
+    avatarUrl: r.avatar_url ?? null,
+  }
+}
+
+export async function fetchFriends(): Promise<Friend[]> {
+  const { data } = await http.get<RawFriend[]>('/friends')
+  return (data ?? []).map(mapFriend)
+}
+
+export async function fetchRequests(): Promise<Friend[]> {
+  const { data } = await http.get<RawFriend[]>('/friends/requests')
+  return (data ?? []).map(mapFriend)
+}
+
+export async function addFriend(username: string): Promise<Friend> {
+  const { data } = await http.post<RawFriend>('/friends', { username })
+  return mapFriend(data)
+}
+
+export async function acceptFriend(friendshipId: number): Promise<Friend> {
+  const { data } = await http.post<RawFriend>(`/friends/${friendshipId}/accept`)
+  return mapFriend(data)
+}
+
+export async function removeFriend(friendshipId: number): Promise<void> {
+  await http.delete(`/friends/${friendshipId}`)
+}
+
+export async function searchFriends(q: string): Promise<FriendBrief[]> {
+  const { data } = await http.get<RawFriendBrief[]>('/friends/search', { params: { q } })
+  return (data ?? []).map(mapBrief)
+}

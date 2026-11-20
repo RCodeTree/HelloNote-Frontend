@@ -11,6 +11,7 @@ import BaseTag from '@/components/common/BaseTag.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import TagSelect from '../components/TagSelect.vue'
 import EditorToolbar, { type ToolCommand } from '../components/EditorToolbar.vue'
+import NoteComments from '../components/NoteComments.vue'
 import { mdToHtml } from '../utils/markdown'
 import { useToast } from '@/composables/useToast'
 
@@ -573,6 +574,7 @@ function formatDate(value: string | undefined): string {
           v-html="previewHtml"
           @scroll="onAreaScroll"
         />
+        <NoteComments v-if="isEdit && noteId !== null" :note-id="noteId" />
         <p v-if="error" class="editor__error">{{ error }}</p>
       </article>
 

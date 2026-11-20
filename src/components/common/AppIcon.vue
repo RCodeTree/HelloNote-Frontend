@@ -41,6 +41,11 @@ import {
   Flame,
   Activity as ActivityIcon,
   TrendingUp,
+  Heart,
+  MessageCircle,
+  Users,
+  Send,
+  UserPlus,
 } from 'lucide-vue-next'
 import type { Component } from 'vue'
 
@@ -86,6 +91,11 @@ export type IconName =
   | 'flame'
   | 'activity'
   | 'trending-up'
+  | 'heart'
+  | 'message'
+  | 'users'
+  | 'send'
+  | 'user-plus'
 
 const props = withDefaults(
   defineProps<{
@@ -141,6 +151,11 @@ const iconMap: Record<IconName, Component> = {
   flame: Flame,
   activity: ActivityIcon,
   'trending-up': TrendingUp,
+  heart: Heart,
+  message: MessageCircle,
+  users: Users,
+  send: Send,
+  'user-plus': UserPlus,
 }
 
 const Icon = iconMap[props.name]

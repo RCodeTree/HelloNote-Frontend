@@ -40,6 +40,18 @@ export const routes: RouteRecordRaw[] = [
     meta: { title: '编辑笔记', layout: 'default', requiresAuth: true, fullBleed: true },
   },
   {
+    path: '/friends',
+    name: 'friends',
+    component: () => import('@/modules/friends/pages/FriendsPage.vue'),
+    meta: { title: '笔友', layout: 'default', requiresAuth: true },
+  },
+  {
+    path: '/chats',
+    name: 'chats',
+    component: () => import('@/modules/chat/pages/ChatsPage.vue'),
+    meta: { title: '消息', layout: 'default', requiresAuth: true },
+  },
+  {
     path: '/profile',
     name: 'profile',
     component: () => import('@/modules/auth/pages/ProfilePage.vue'),
