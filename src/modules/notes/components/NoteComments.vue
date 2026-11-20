@@ -13,14 +13,10 @@ const props = defineProps<{ noteId: number }>()
 
 const store = useCommentStore()
 const toast = useToast()
-const { commentsByNote, likeByNote, loadingByNote, likingByNote, error } = storeToRefs(store)
+const { commentsByNote, loadingByNote, error } = storeToRefs(store)
 
 const comments = computed(() => commentsByNote.value[props.noteId] ?? [])
-const likeState = computed(
-  () => likeByNote.value[props.noteId] ?? { likeCount: 0, likedByMe: false },
-)
 const loading = computed(() => loadingByNote.value[props.noteId] === true)
-const liking = computed(() => likingByNote.value[props.noteId] === true)
 
 const draft = ref('')
 const replyTo = ref<number | null>(null)
@@ -78,10 +74,6 @@ async function submit(): Promise<void> {
   }
 }
 
-async function onLike(): Promise<void> {
-  await store.toggleLike(props.noteId)
-}
-
 async function onDelete(id: number): Promise<void> {
   deletingId.value = id
   const ok = await store.remove(props.noteId, id)
@@ -93,25 +85,6 @@ async function onDelete(id: number): Promise<void> {
 
 <template>
   <section class="comments">
-    <header class="comments__head">
-      <h2 class="comments__title">
-        <AppIcon name="message" :size="18" />
-        <span>评论</span>
-        <span class="comments__count">{{ comments.length }}</span>
-      </h2>
-      <button
-        type="button"
-        class="comments__like"
-        :class="{ 'is-liked': likeState.likedByMe }"
-        :disabled="liking"
-        :title="likeState.likedByMe ? '取消点赞' : '点赞'"
-        @click="onLike"
-      >
-        <AppIcon name="heart" :size="18" />
-        <span>{{ likeState.likeCount }}</span>
-      </button>
-    </header>
-
     <div v-if="loading" class="comments__loading">加载中…</div>
     <EmptyState v-else-if="!comments.length" title="暂无评论" />
     <ul v-else class="comments__list">
@@ -172,64 +145,6 @@ async function onDelete(id: number): Promise<void> {
 <style scoped>
 .comments {
   width: 100%;
-  border-top: 1px solid var(--border-default);
-  padding-top: var(--space-6);
-  margin-top: var(--space-2);
-}
-.comments__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  margin-bottom: var(--space-4);
-}
-.comments__title {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 17px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-.comments__count {
-  font-family: var(--font-body);
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-muted);
-}
-.comments__like {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: 6px 12px;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-full);
-  background: var(--bg-card);
-  color: var(--text-secondary);
-  font-size: 13px;
-  cursor: pointer;
-  transition:
-    color var(--duration-fast) var(--ease-standard),
-    border-color var(--duration-fast) var(--ease-standard),
-    background-color var(--duration-fast) var(--ease-standard);
-}
-.comments__like:hover:not(:disabled) {
-  border-color: var(--accent-danger);
-  color: var(--accent-danger);
-}
-.comments__like.is-liked {
-  color: var(--accent-danger);
-  border-color: color-mix(in srgb, var(--accent-danger) 45%, transparent);
-  background: color-mix(in srgb, var(--accent-danger) 10%, transparent);
-}
-.comments__like.is-liked :deep(.app-icon) {
-  fill: currentColor;
-}
-.comments__like:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
 }
 .comments__loading {
   padding: var(--space-6) 0;

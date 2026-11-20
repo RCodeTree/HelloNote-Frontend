@@ -11,7 +11,7 @@ import BaseTag from '@/components/common/BaseTag.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import TagSelect from '../components/TagSelect.vue'
 import EditorToolbar, { type ToolCommand } from '../components/EditorToolbar.vue'
-import NoteComments from '../components/NoteComments.vue'
+import NoteSocialButtons from '../components/NoteSocialButtons.vue'
 import { mdToHtml } from '../utils/markdown'
 import { useToast } from '@/composables/useToast'
 
@@ -516,6 +516,8 @@ function formatDate(value: string | undefined): string {
         <button v-if="isEdit" class="editor__iconbtn editor__iconbtn--danger" title="删除笔记" @click="requestDelete">
           <AppIcon name="trash" :size="17" />
         </button>
+        <!-- 评论 / 点赞：图标入口，点击展开悬浮框 -->
+        <NoteSocialButtons v-if="isEdit && noteId !== null" :note-id="noteId" />
         <BaseButton
           variant="primary"
           size="sm"
@@ -574,7 +576,6 @@ function formatDate(value: string | undefined): string {
           v-html="previewHtml"
           @scroll="onAreaScroll"
         />
-        <NoteComments v-if="isEdit && noteId !== null" :note-id="noteId" />
         <p v-if="error" class="editor__error">{{ error }}</p>
       </article>
 
