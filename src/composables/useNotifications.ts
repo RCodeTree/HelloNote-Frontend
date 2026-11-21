@@ -2,6 +2,7 @@ import { onMounted, onUnmounted } from 'vue'
 import { useToast } from '@/composables/useToast'
 import { useAuthStore } from '@/modules/auth'
 import { useNotificationsStore } from '@/modules/notifications'
+import { useChatStore } from '@/modules/chat/stores/chat.store'
 import * as notificationsApi from '@/modules/notifications/api/notifications.api'
 import { fetchConversations } from '@/modules/chat/api/chat.api'
 import type { Conversation } from '@/modules/chat/types/chat.types'
@@ -82,6 +83,7 @@ function showNotificationToast(n: Notification, toast: ReturnType<typeof useToas
 export function useNotifications(): void {
   const auth = useAuthStore()
   const notificationStore = useNotificationsStore()
+  const chatStore = useChatStore()
   const toast = useToast()
 
   async function poll(): Promise<void> {
@@ -116,13 +118,10 @@ export function useNotifications(): void {
       let nextBaseline = convBaseline
       for (const c of conversations) {
         const prev = convBaseline[c.id]
-        if (
-          prev &&
-          prev.unreadCount === 0 &&
-          c.unreadCount > 0 &&
-          c.lastMessageAt &&
-          c.lastMessageAt !== prev.lastMessageAt
-        ) {
+        const hasNew =
+          prev && c.lastMessageAt && c.lastMessageAt !== prev.lastMessageAt && c.unreadCount > 0
+        // 用户正打开该会话时，消息由聊天窗口的轮询直接同步显示，不重复弹 toast
+        if (hasNew && chatStore.activeConversationId !== c.id) {
           toast.friendMessage({
             avatar: c.peer.avatarUrl,
             name: c.peer.displayName,

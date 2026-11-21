@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import AppIcon from '@/components/common/AppIcon.vue'
@@ -23,6 +23,8 @@ const { conversations, messagesByConv, messagesLoading, sending, error } = store
 const activeId = ref<number | null>(null)
 const draft = ref('')
 const messageListEl = ref<HTMLElement | null>(null)
+let pollTimer: number | undefined
+const MSG_POLL_MS = 4000
 
 const activeConv = computed(() => conversations.value.find((c) => c.id === activeId.value) ?? null)
 const messages = computed(() => (activeId.value === null ? [] : messagesByConv.value[activeId.value] ?? []))
@@ -39,6 +41,14 @@ async function openFromRoute(): Promise<void> {
 onMounted(async () => {
   if (!auth.user && auth.token) await auth.fetchUser()
   await openFromRoute()
+  pollTimer = window.setInterval(() => {
+    if (activeId.value !== null) void store.loadMessages(activeId.value)
+  }, MSG_POLL_MS)
+})
+
+onBeforeUnmount(() => {
+  if (pollTimer !== undefined) window.clearInterval(pollTimer)
+  store.setActiveConversation(null)
 })
 
 watch(() => route.params.userId, () => {
@@ -46,6 +56,7 @@ watch(() => route.params.userId, () => {
 })
 
 watch(activeId, (id) => {
+  store.setActiveConversation(id)
   if (id !== null) void store.loadMessages(id)
 })
 

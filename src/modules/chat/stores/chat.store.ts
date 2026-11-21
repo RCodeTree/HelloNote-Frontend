@@ -10,6 +10,12 @@ export const useChatStore = defineStore('chat', () => {
   const messagesLoading = ref(false)
   const sending = ref(false)
   const error = ref<string | null>(null)
+  // 当前正在查看的会话：全局轮询据此决定新消息是同步进窗口还是弹 toast
+  const activeConversationId = ref<number | null>(null)
+
+  function setActiveConversation(id: number | null): void {
+    activeConversationId.value = id
+  }
 
   async function loadConversations(): Promise<void> {
     loading.value = true
@@ -23,13 +29,22 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  function sameMessages(a: Message[], b: Message[]): boolean {
+    if (a.length !== b.length) return false
+    return a.every((m, i) =>
+      m.id === b[i].id && m.content === b[i].content && m.isRead === b[i].isRead,
+    )
+  }
+
   async function loadMessages(conversationId: number): Promise<void> {
     messagesLoading.value = true
     error.value = null
     try {
-      messagesByConv.value = {
-        ...messagesByConv.value,
-        [conversationId]: await chatApi.fetchMessages(conversationId),
+      const fresh = await chatApi.fetchMessages(conversationId)
+      const current = messagesByConv.value[conversationId] ?? []
+      // 内容未变则跳过写入，避免轮询时重复触发滚动/渲染
+      if (!sameMessages(current, fresh)) {
+        messagesByConv.value = { ...messagesByConv.value, [conversationId]: fresh }
       }
       // 进入会话即已读：清掉该会话未读角标
       conversations.value = conversations.value.map((c) =>
@@ -85,6 +100,8 @@ export const useChatStore = defineStore('chat', () => {
     messagesLoading,
     sending,
     error,
+    activeConversationId,
+    setActiveConversation,
     loadConversations,
     loadMessages,
     send,
