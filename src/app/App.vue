@@ -6,12 +6,16 @@ import BlankLayout from '@/layouts/BlankLayout.vue'
 import AppToast from '@/components/feedback/AppToast.vue'
 import { useAppStore } from '@/stores/app.store'
 import { useActivityTracker } from '@/modules/dashboard/composables/useActivityTracker'
+import { useNotifications } from '@/composables/useNotifications'
 
 const route = useRoute()
 const appStore = useAppStore()
 
 // 全局活跃时长心跳：覆盖所有登录态页面（含编辑器），为面板「活动时长」累计数据
 useActivityTracker()
+
+// 全局通知轮询：新通知与好友消息以左下角 toast 推送
+useNotifications()
 
 const layouts = { default: DefaultLayout, blank: BlankLayout }
 const layoutComponent = computed(

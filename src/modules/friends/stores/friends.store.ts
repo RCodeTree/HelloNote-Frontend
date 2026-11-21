@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import * as friendsApi from '../api/friends.api'
-import type { Friend, FriendBrief } from '../types/friends.types'
+import type { Friend, FriendBrief, FriendSettings } from '../types/friends.types'
 
 export const useFriendsStore = defineStore('friends', () => {
   const friends = ref<Friend[]>([])
@@ -62,6 +62,19 @@ export const useFriendsStore = defineStore('friends', () => {
     }
   }
 
+  async function updateSettings(friendshipId: number, payload: FriendSettings): Promise<boolean> {
+    error.value = null
+    try {
+      const updated = await friendsApi.updateFriendSettings(friendshipId, payload)
+      friends.value = friends.value.map((f) => (f.id === friendshipId ? updated : f))
+      await loadFriends()
+      return true
+    } catch (e: any) {
+      error.value = e?.response?.data?.detail || '保存设置失败'
+      return false
+    }
+  }
+
   async function remove(friendshipId: number): Promise<boolean> {
     error.value = null
     try {
@@ -97,6 +110,7 @@ export const useFriendsStore = defineStore('friends', () => {
     loadRequests,
     add,
     accept,
+    updateSettings,
     remove,
     search,
   }

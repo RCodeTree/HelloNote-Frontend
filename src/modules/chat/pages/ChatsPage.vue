@@ -8,6 +8,7 @@ import UserAvatar from '@/components/common/UserAvatar.vue'
 import EmptyState from '@/components/feedback/EmptyState.vue'
 import { useToast } from '@/composables/useToast'
 import { useAuthStore } from '@/modules/auth/stores/auth.store'
+import { useNotificationsStore } from '@/modules/notifications/stores/notifications.store'
 import { useChatStore } from '../stores/chat.store'
 import type { Conversation } from '../types/chat.types'
 
@@ -15,6 +16,7 @@ const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 const store = useChatStore()
+const notifications = useNotificationsStore()
 const toast = useToast()
 const { conversations, messagesByConv, loading, messagesLoading, sending, error } = storeToRefs(store)
 
@@ -27,16 +29,23 @@ const activeConv = computed(() => conversations.value.find((c) => c.id === activ
 const messages = computed(() => (activeId.value === null ? [] : messagesByConv.value[activeId.value] ?? []))
 const myId = computed(() => auth.user?.id ?? null)
 
+async function openFromRoute(): Promise<void> {
+  const raw = route.params.userId
+  const userId = Number(Array.isArray(raw) ? raw[0] : raw)
+  if (!Number.isFinite(userId) || userId <= 0) return
+  const conv = await store.openWith(userId)
+  if (conv) await selectConversation(conv)
+}
+
 onMounted(async () => {
   if (!auth.user && auth.token) await auth.fetchUser()
   await store.loadConversations()
+  await openFromRoute()
+})
 
-  const raw = route.query.user_id
-  const userId = Number(Array.isArray(raw) ? raw[0] : raw)
-  if (raw && Number.isFinite(userId) && userId > 0) {
-    const conv = await store.openWith(userId)
-    if (conv) await selectConversation(conv)
-  }
+// 同一组件复用：从会话列表切换好友时，按新 userId 打开对应会话
+watch(() => route.params.userId, () => {
+  void openFromRoute()
 })
 
 watch(activeId, (id) => {
@@ -84,7 +93,10 @@ async function submit(): Promise<void> {
   if (sent === null) {
     draft.value = text
     toast.error(error.value || '发送失败')
+    return
   }
+  void store.loadConversations()
+  void notifications.refreshCount()
 }
 </script>
 
@@ -112,7 +124,7 @@ async function submit(): Promise<void> {
               type="button"
               class="conv"
               :class="{ 'is-active': activeId === conv.id }"
-              @click="selectConversation(conv)"
+              @click="router.push(`/chats/${conv.peer.id}`)"
             >
               <UserAvatar :name="conv.peer.displayName" :url="conv.peer.avatarUrl" :size="42" />
               <span class="conv__body">
@@ -142,6 +154,14 @@ async function submit(): Promise<void> {
             @click="backToList"
           >
             <AppIcon name="chevron-left" :size="18" />
+          </button>
+          <button
+            type="button"
+            class="chat-window__friends"
+            @click="router.push('/friends')"
+          >
+            <AppIcon name="users" :size="15" />
+            <span>返回笔友</span>
           </button>
           <UserAvatar :name="activeConv.peer.displayName" :url="activeConv.peer.avatarUrl" :size="34" />
           <div class="chat-window__peer">
@@ -340,6 +360,24 @@ async function submit(): Promise<void> {
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
+}
+.chat-window__friends {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+}
+.chat-window__friends:hover {
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
 }
 .chat-window__peer {
   display: flex;

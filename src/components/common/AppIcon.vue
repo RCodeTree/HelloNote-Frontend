@@ -46,6 +46,9 @@ import {
   Users,
   Send,
   UserPlus,
+  Settings,
+  Bell,
+  Info,
 } from 'lucide-vue-next'
 import type { Component } from 'vue'
 
@@ -96,6 +99,9 @@ export type IconName =
   | 'users'
   | 'send'
   | 'user-plus'
+  | 'settings'
+  | 'bell'
+  | 'info'
 
 const props = withDefaults(
   defineProps<{
@@ -156,6 +162,9 @@ const iconMap: Record<IconName, Component> = {
   users: Users,
   send: Send,
   'user-plus': UserPlus,
+  settings: Settings,
+  bell: Bell,
+  info: Info,
 }
 
 const Icon = iconMap[props.name]

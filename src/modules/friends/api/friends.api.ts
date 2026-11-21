@@ -1,5 +1,11 @@
 import http from '@/services/http/client'
-import type { Friend, FriendBrief } from '../types/friends.types'
+import type {
+  Friend,
+  FriendBrief,
+  FriendCloseness,
+  FriendPrivacy,
+  FriendSettings,
+} from '../types/friends.types'
 
 // 后端返回 snake_case，这里映射为前端 camelCase 领域模型。
 interface RawFriend {
@@ -11,6 +17,18 @@ interface RawFriend {
   bio: string | null
   status: string
   is_requester: boolean
+  note?: string | null
+  privacy?: string | null
+  relation_type?: string | null
+  closeness?: string | null
+  unread_count?: number
+}
+
+interface RawFriendSettings {
+  note?: string
+  privacy?: FriendPrivacy
+  relation_type?: string
+  closeness?: FriendCloseness
 }
 
 interface RawFriendBrief {
@@ -18,6 +36,14 @@ interface RawFriendBrief {
   username: string | null
   display_name: string | null
   avatar_url: string | null
+}
+
+function toPrivacy(value: string | null | undefined): FriendPrivacy {
+  return value === 'friends' || value === 'hidden' ? value : 'all'
+}
+
+function toCloseness(value: string | null | undefined): FriendCloseness {
+  return value === 'friend' || value === 'close' || value === 'intimate' ? value : 'acquaintance'
 }
 
 function mapFriend(r: RawFriend): Friend {
@@ -30,6 +56,11 @@ function mapFriend(r: RawFriend): Friend {
     bio: r.bio ?? '',
     status: r.status ?? '',
     isRequester: !!r.is_requester,
+    note: r.note ?? '',
+    privacy: toPrivacy(r.privacy),
+    relationType: r.relation_type ?? '',
+    closeness: toCloseness(r.closeness),
+    unreadCount: r.unread_count ?? 0,
   }
 }
 
@@ -64,6 +95,16 @@ export async function acceptFriend(friendshipId: number): Promise<Friend> {
 
 export async function removeFriend(friendshipId: number): Promise<void> {
   await http.delete(`/friends/${friendshipId}`)
+}
+
+export async function updateFriendSettings(friendshipId: number, payload: FriendSettings): Promise<Friend> {
+  const body: RawFriendSettings = {}
+  if (payload.note !== undefined) body.note = payload.note
+  if (payload.privacy !== undefined) body.privacy = payload.privacy
+  if (payload.relationType !== undefined) body.relation_type = payload.relationType
+  if (payload.closeness !== undefined) body.closeness = payload.closeness
+  const { data } = await http.patch<RawFriend>(`/friends/${friendshipId}/settings`, body)
+  return mapFriend(data)
 }
 
 export async function searchFriends(q: string): Promise<FriendBrief[]> {
