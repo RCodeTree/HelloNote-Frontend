@@ -2,15 +2,13 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
-import AppIcon, { type IconName } from '@/components/common/AppIcon.vue'
+import AppIcon from '@/components/common/AppIcon.vue'
 import BaseButton from '@/components/common/BaseButton.vue'
 import BaseInput from '@/components/common/BaseInput.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import UserAvatar from '@/components/common/UserAvatar.vue'
 import EmptyState from '@/components/feedback/EmptyState.vue'
 import { useToast } from '@/composables/useToast'
-import { useNotificationsStore } from '@/modules/notifications/stores/notifications.store'
-import type { Notification, NotificationType } from '@/modules/notifications/types/notifications.types'
 import { useFriendsStore } from '../stores/friends.store'
 import type {
   Friend,
@@ -21,20 +19,15 @@ import type {
 
 const router = useRouter()
 const store = useFriendsStore()
-const notificationStore = useNotificationsStore()
 const toast = useToast()
 const { friends, loading, error } = storeToRefs(store)
-const { notifications, unreadCount, loading: notificationsLoading } = storeToRefs(notificationStore)
 
 const addOpen = ref(false)
-const notifOpen = ref(false)
 const keyword = ref('')
 const results = ref<FriendBrief[]>([])
 const searching = ref(false)
 const searched = ref(false)
 const adding = ref(false)
-const acceptingId = ref<number | null>(null)
-
 const settingsTarget = ref<Friend | null>(null)
 const settingsOpen = computed(() => settingsTarget.value !== null)
 const settingsSaving = ref(false)
@@ -46,20 +39,6 @@ const formCloseness = ref<FriendCloseness>('acquaintance')
 const deleteTarget = ref<Friend | null>(null)
 const deleteOpen = computed(() => deleteTarget.value !== null)
 
-const notificationIcon: Record<NotificationType, IconName> = {
-  system: 'info',
-  comment: 'message',
-  like: 'heart',
-  friend_request: 'user-plus',
-  friend_accept: 'check',
-}
-const notificationLabel: Record<NotificationType, string> = {
-  system: '系统',
-  comment: '评论',
-  like: '点赞',
-  friend_request: '好友申请',
-  friend_accept: '好友通过',
-}
 const privacyLabel: Record<FriendPrivacy, string> = {
   all: '公开',
   friends: '仅好友',
@@ -75,7 +54,7 @@ const closenessLabel: Record<FriendCloseness, string> = {
 let timer: ReturnType<typeof setTimeout> | null = null
 
 onMounted(() => {
-  void Promise.all([store.init(), notificationStore.load()])
+  void store.init()
 })
 onBeforeUnmount(() => {
   if (timer) clearTimeout(timer)
@@ -98,18 +77,6 @@ watch(keyword, (val) => {
 
 function displayName(friend: Friend): string {
   return friend.note || friend.displayName
-}
-
-function formatTime(value: string | null): string {
-  if (!value) return ''
-  const d = new Date(value)
-  if (isNaN(d.getTime())) return ''
-  return d.toLocaleString('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
 }
 
 function toggleAdd(): void {
@@ -146,55 +113,6 @@ async function addFromResult(brief: FriendBrief): Promise<void> {
   adding.value = false
   if (ok) toast.success('已发送申请')
   else toast.error(error.value || '添加失败')
-}
-
-async function acceptRequest(n: Notification): Promise<void> {
-  if (n.relatedId === null || acceptingId.value !== null) return
-  acceptingId.value = n.id
-  const ok = await store.accept(n.relatedId)
-  acceptingId.value = null
-  if (!ok) {
-    toast.error(error.value || '操作失败')
-    return
-  }
-  toast.success('已接受')
-  await notificationStore.markRead(n.id)
-  await notificationStore.load()
-}
-
-async function ignoreRequest(n: Notification): Promise<void> {
-  if (n.relatedId === null) return
-  const ok = await store.remove(n.relatedId)
-  if (!ok) {
-    toast.error(error.value || '操作失败')
-    return
-  }
-  await notificationStore.markRead(n.id)
-  await notificationStore.load()
-}
-
-function openNotifications(): void {
-  notifOpen.value = true
-  void notificationStore.load()
-}
-
-function notificationTarget(n: Notification): string | null {
-  if (n.type === 'friend_request' || n.type === 'friend_accept') return '/friends'
-  if (n.relatedId !== null && (n.type === 'comment' || n.type === 'like')) {
-    return `/notes/${n.relatedId}/edit`
-  }
-  return null
-}
-
-function onNotificationClick(n: Notification): void {
-  if (!n.isRead) void notificationStore.markRead(n.id)
-  const target = notificationTarget(n)
-  if (target) void router.push(target)
-}
-
-async function readAll(): Promise<void> {
-  const ok = await notificationStore.markAllRead()
-  if (!ok) toast.error(error.value || '操作失败')
 }
 
 function openSettings(friend: Friend): void {
@@ -281,24 +199,8 @@ async function onDelete(): Promise<void> {
       </div>
     </section>
 
-    <!-- 统一列表：系统通知（固定首项）+ 笔友项 -->
+    <!-- 笔友列表：每个 item 是独立卡片 -->
     <div class="friend-list-panel">
-      <!-- 系统通知：默认入口，点击进入系统消息 -->
-      <button type="button" class="list-item list-item--system" @click="openNotifications">
-        <span class="list-item__icon list-item__icon--system">
-          <AppIcon name="bell" :size="20" />
-        </span>
-        <span class="list-item__body">
-          <span class="list-item__line">
-            <span class="list-item__name">系统通知</span>
-            <span v-if="unreadCount > 0" class="list-item__badge">{{ unreadCount }}</span>
-          </span>
-          <span class="list-item__sub">{{ unreadCount > 0 ? `${unreadCount} 条未读` : '查看系统消息' }}</span>
-        </span>
-        <AppIcon name="chevron-right" :size="16" class="list-item__arrow" />
-      </button>
-
-      <!-- 笔友项 -->
       <template v-if="loading && !friends.length">
         <div class="friend-list-loading">加载中…</div>
       </template>
@@ -336,59 +238,6 @@ async function onDelete(): Promise<void> {
       </template>
       <EmptyState v-else title="暂无笔友" />
     </div>
-
-    <!-- 系统消息详情（抽屉） -->
-    <Teleport to="body">
-      <div v-if="notifOpen" class="notif-drawer">
-        <div class="notif-drawer__scrim" @click="notifOpen = false" />
-        <aside class="notif-drawer__panel" role="dialog" aria-modal="true">
-          <header class="notif-drawer__head">
-            <h2 class="notif-drawer__title">系统通知</h2>
-            <div class="notif-drawer__ops">
-              <BaseButton v-if="notifications.length" variant="ghost" size="sm" @click="readAll">全部已读</BaseButton>
-              <button type="button" class="settings__close" aria-label="关闭" @click="notifOpen = false">
-                <AppIcon name="close" :size="16" />
-              </button>
-            </div>
-          </header>
-          <div class="notif-drawer__body">
-            <div v-if="notificationsLoading && !notifications.length" class="friend-section__loading">加载中…</div>
-            <EmptyState v-else-if="!notifications.length" title="暂无通知" />
-            <ul v-else class="notification-list">
-              <li
-                v-for="n in notifications"
-                :key="n.id"
-                class="notification"
-                :class="{ 'is-unread': !n.isRead }"
-                @click="onNotificationClick(n)"
-              >
-                <span class="notification__icon" :class="`notification__icon--${n.type}`">
-                  <AppIcon :name="notificationIcon[n.type]" :size="15" />
-                </span>
-                <div class="notification__body">
-                  <div class="notification__top">
-                    <span class="notification__label">{{ notificationLabel[n.type] }}</span>
-                    <time class="notification__time">{{ formatTime(n.createdAt) }}</time>
-                  </div>
-                  <p class="notification__content">{{ n.content }}</p>
-                  <div v-if="n.type === 'friend_request' && n.relatedId !== null" class="notification__ops">
-                    <BaseButton
-                      variant="primary"
-                      size="sm"
-                      :loading="acceptingId === n.id"
-                      @click.stop="acceptRequest(n)"
-                    >
-                      接受
-                    </BaseButton>
-                    <BaseButton variant="ghost" size="sm" @click.stop="ignoreRequest(n)">忽略</BaseButton>
-                  </div>
-                </div>
-              </li>
-            </ul>
-          </div>
-        </aside>
-      </div>
-    </Teleport>
 
     <!-- 好友设置 -->
     <Teleport to="body">
@@ -540,21 +389,6 @@ async function onDelete(): Promise<void> {
   transform: translateY(-1px);
   box-shadow: var(--shadow-floating);
 }
-.list-item__icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 42px;
-  height: 42px;
-  flex-shrink: 0;
-  border-radius: 50%;
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
-}
-.list-item__icon--system {
-  background: color-mix(in srgb, var(--accent-primary) 14%, transparent);
-  color: var(--accent-primary);
-}
 .list-item__avatar {
   position: relative;
   flex-shrink: 0;
@@ -591,23 +425,8 @@ async function onDelete(): Promise<void> {
   font-weight: 600;
   color: var(--text-primary);
 }
-.list-item__badge {
-  min-width: 17px;
-  height: 17px;
-  padding: 0 5px;
-  border-radius: var(--radius-full);
-  background: var(--accent-danger);
-  color: #fff;
-  font-size: 10px;
-  line-height: 17px;
-  text-align: center;
-}
 .list-item__sub {
   font-size: 12px;
-  color: var(--text-muted);
-}
-.list-item__arrow {
-  flex-shrink: 0;
   color: var(--text-muted);
 }
 .friend-list-loading {
@@ -617,65 +436,7 @@ async function onDelete(): Promise<void> {
   text-align: center;
 }
 
-/* 系统消息抽屉 */
-.notif-drawer {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  display: flex;
-  justify-content: flex-end;
-  animation: modal-fade var(--duration-fast) var(--ease-standard);
-}
-.notif-drawer__scrim {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
-}
-.notif-drawer__panel {
-  position: relative;
-  z-index: 1;
-  width: min(440px, 100vw);
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  background: var(--bg-card);
-  border-left: 1px solid var(--border-default);
-  box-shadow: var(--shadow-floating);
-}
-.notif-drawer__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  padding: var(--space-4);
-  border-bottom: 1px solid var(--border-default);
-}
-.notif-drawer__title {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-.notif-drawer__ops {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-.notif-drawer__body {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-}
-.friend-section__loading {
-  padding: var(--space-6) 0;
-  font-size: 13px;
-  color: var(--text-muted);
-}
-.friend-list,
-.notification-list {
+.friend-list {
   display: flex;
   flex-direction: column;
   list-style: none;
@@ -769,78 +530,6 @@ async function onDelete(): Promise<void> {
   color: var(--accent-primary);
   background: var(--bg-card);
 }
-.notification {
-  display: flex;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  border-bottom: 1px solid var(--border-default);
-  border-left: 2px solid transparent;
-  cursor: pointer;
-  transition: background var(--duration-fast) var(--ease-standard);
-}
-.notification:last-child {
-  border-bottom: none;
-}
-.notification:hover {
-  background: var(--bg-secondary);
-}
-.notification.is-unread {
-  border-left-color: var(--accent-primary);
-  background: color-mix(in srgb, var(--accent-primary) 6%, transparent);
-}
-.notification__icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  flex-shrink: 0;
-  border-radius: 50%;
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
-}
-.notification__icon--friend_request,
-.notification__icon--friend_accept {
-  background: color-mix(in srgb, var(--accent-primary) 14%, transparent);
-  color: var(--accent-primary);
-}
-.notification__icon--like {
-  background: color-mix(in srgb, var(--accent-danger) 14%, transparent);
-  color: var(--accent-danger);
-}
-.notification__body {
-  flex: 1;
-  min-width: 0;
-}
-.notification__top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-}
-.notification__label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-.notification__time {
-  flex-shrink: 0;
-  font-size: 11px;
-  color: var(--text-muted);
-}
-.notification__content {
-  margin: 4px 0 0;
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--text-primary);
-  word-break: break-word;
-}
-.notification__ops {
-  display: flex;
-  gap: var(--space-2);
-  margin-top: var(--space-2);
-}
-
 .settings {
   position: fixed;
   inset: 0;
