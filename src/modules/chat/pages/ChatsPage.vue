@@ -29,6 +29,43 @@ const MSG_POLL_MS = 4000
 const activeConv = computed(() => conversations.value.find((c) => c.id === activeId.value) ?? null)
 const messages = computed(() => (activeId.value === null ? [] : messagesByConv.value[activeId.value] ?? []))
 const myId = computed(() => auth.user?.id ?? null)
+// 自己的头像昵称取登录用户，对方取会话 peer
+const me = computed(() => auth.user)
+
+const TIME_GROUP_MS = 5 * 60 * 1000
+
+function ts(value: string): number {
+  const d = new Date(value)
+  return isNaN(d.getTime()) ? 0 : d.getTime()
+}
+
+/** 微信式时间：今天 HH:mm、昨天 昨天 HH:mm、更早 M月D日 HH:mm */
+function formatChatTime(value: string): string {
+  const d = new Date(value)
+  if (isNaN(d.getTime())) return ''
+  const now = new Date()
+  const sameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+  const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  if (sameDay(d, now)) return hm
+  const yesterday = new Date(now)
+  yesterday.setDate(now.getDate() - 1)
+  if (sameDay(d, yesterday)) return `昨天 ${hm}`
+  if (d.getFullYear() === now.getFullYear()) return `${d.getMonth() + 1}月${d.getDate()}日 ${hm}`
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 ${hm}`
+}
+
+/** 每组首条显示时间（相邻间隔超过 5 分钟），其余隐藏 */
+const messageRows = computed(() =>
+  messages.value.map((m, i) => {
+    const prev = i > 0 ? messages.value[i - 1] : null
+    return {
+      ...m,
+      showTime: !prev || ts(m.createdAt) - ts(prev.createdAt) >= TIME_GROUP_MS,
+      timeLabel: formatChatTime(m.createdAt),
+    }
+  }),
+)
 
 async function openFromRoute(): Promise<void> {
   const raw = route.params.userId
@@ -75,18 +112,6 @@ async function selectConversation(conv: Conversation): Promise<void> {
   await nextTick(scrollToBottom)
 }
 
-function formatTime(value: string | null): string {
-  if (!value) return ''
-  const d = new Date(value)
-  if (isNaN(d.getTime())) return ''
-  return d.toLocaleString('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
-
 async function submit(): Promise<void> {
   if (activeId.value === null) return
   const text = draft.value.trim()
@@ -124,15 +149,28 @@ async function submit(): Promise<void> {
       <div ref="messageListEl" class="chat-window__messages">
         <div v-if="messagesLoading" class="chat-window__loading">加载中…</div>
         <EmptyState v-else-if="!messages.length" title="暂无消息" />
-        <div
-          v-for="msg in messages"
-          :key="msg.id"
-          class="msg"
-          :class="{ 'is-mine': myId !== null && msg.senderId === myId }"
-        >
-          <div class="msg__bubble">{{ msg.content }}</div>
-          <time class="msg__time">{{ formatTime(msg.createdAt) }}</time>
-        </div>
+        <TransitionGroup :key="activeId ?? 0" name="msg" tag="div" class="msg-list">
+          <div v-for="msg in messageRows" :key="msg.id" class="msg-item">
+            <div v-if="msg.showTime" class="msg__time">{{ msg.timeLabel }}</div>
+            <div
+              class="msg"
+              :class="{ 'is-mine': myId !== null && msg.senderId === myId }"
+            >
+              <UserAvatar
+                class="msg__avatar"
+                :name="myId !== null && msg.senderId === myId ? (me?.displayName || '我') : activeConv.peer.displayName"
+                :url="myId !== null && msg.senderId === myId ? (me?.avatarUrl ?? null) : activeConv.peer.avatarUrl"
+                :size="34"
+              />
+              <div class="msg__main">
+                <span class="msg__name">
+                  {{ myId !== null && msg.senderId === myId ? (me?.displayName || '我') : activeConv.peer.displayName }}
+                </span>
+                <div class="msg__bubble">{{ msg.content }}</div>
+              </div>
+            </div>
+          </div>
+        </TransitionGroup>
       </div>
 
       <div class="chat-window__composer">
@@ -220,25 +258,87 @@ async function submit(): Promise<void> {
   min-height: 0;
   overflow-y: auto;
   padding: var(--space-5);
+}
+.msg-list {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+}
+.msg-item {
+  display: flex;
+  flex-direction: column;
+}
+/* 消息进出的自然过渡：淡入 + 轻微上移/缩放（弹性缓动） */
+.msg-enter-active {
+  transition:
+    opacity 320ms var(--ease-standard),
+    transform 380ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.msg-leave-active {
+  transition:
+    opacity 180ms var(--ease-standard),
+    transform 180ms var(--ease-standard);
+}
+.msg-enter-from {
+  opacity: 0;
+  transform: translateY(14px) scale(0.97);
+}
+.msg-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+.msg-move {
+  transition: transform 320ms var(--ease-standard);
+}
+@media (prefers-reduced-motion: reduce) {
+  .msg-enter-active,
+  .msg-leave-active,
+  .msg-move {
+    transition: none;
+  }
 }
 .chat-window__loading {
   padding: var(--space-6) 0;
   font-size: 13px;
   color: var(--text-muted);
 }
+/* 微信式时间分隔：居中、浅色胶囊 */
+.msg__time {
+  align-self: center;
+  margin: var(--space-2) 0;
+  padding: 2px 10px;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--text-muted) 12%, transparent);
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
 .msg {
   display: flex;
-  flex-direction: column;
   align-items: flex-start;
-  gap: 4px;
+  gap: var(--space-2);
   max-width: 78%;
 }
 .msg.is-mine {
   align-self: flex-end;
+  flex-direction: row-reverse;
+}
+.msg__avatar {
+  flex-shrink: 0;
+}
+.msg__main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.msg.is-mine .msg__main {
   align-items: flex-end;
+}
+.msg__name {
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 0 2px;
 }
 .msg__bubble {
   padding: 9px 13px;
@@ -249,16 +349,12 @@ async function submit(): Promise<void> {
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
-  border-bottom-left-radius: var(--radius-sm);
+  border-top-left-radius: var(--radius-sm);
 }
 .msg.is-mine .msg__bubble {
   background: color-mix(in srgb, var(--accent-primary) 18%, var(--bg-card));
-  border-bottom-left-radius: var(--radius-lg);
-  border-bottom-right-radius: var(--radius-sm);
-}
-.msg__time {
-  font-size: 11px;
-  color: var(--text-muted);
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-sm);
 }
 .chat-window__composer {
   display: flex;
