@@ -178,7 +178,7 @@ function openNotifications(): void {
   void notificationStore.load()
 }
 
-function notificationTarget(n: Notification): void {
+function notificationTarget(n: Notification): string | null {
   if (n.type === 'friend_request' || n.type === 'friend_accept') return '/friends'
   if (n.relatedId !== null && (n.type === 'comment' || n.type === 'like')) {
     return `/notes/${n.relatedId}/edit`
@@ -511,43 +511,163 @@ async function onDelete(): Promise<void> {
   display: flex;
   justify-content: flex-end;
 }
-.friends-list-layout {
+/* 列表容器：仅负责纵向排列与间距，每个 item 是独立卡片 */
+.friend-list-panel {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--space-3);
 }
-/* 列表分区：无独立卡片外壳，标题 + 贯通列表行 */
-.friend-section {
+.list-item {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
   background: var(--bg-card);
-  padding: var(--space-3) var(--space-4);
-  min-width: 0;
+  box-shadow: var(--shadow-card);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
 }
-.friend-section__head {
+.list-item:hover {
+  border-color: color-mix(in srgb, var(--accent-primary) 45%, var(--border-default));
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-floating);
+}
+.list-item__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+}
+.list-item__icon--system {
+  background: color-mix(in srgb, var(--accent-primary) 14%, transparent);
+  color: var(--accent-primary);
+}
+.list-item__avatar {
+  position: relative;
+  flex-shrink: 0;
+}
+.list-item__dot {
+  position: absolute;
+  top: -4px;
+  right: -5px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: var(--radius-full);
+  background: var(--accent-danger);
+  color: #fff;
+  font-size: 10px;
+  line-height: 17px;
+  text-align: center;
+}
+.list-item__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.list-item__line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.list-item__name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.list-item__badge {
+  min-width: 17px;
+  height: 17px;
+  padding: 0 5px;
+  border-radius: var(--radius-full);
+  background: var(--accent-danger);
+  color: #fff;
+  font-size: 10px;
+  line-height: 17px;
+  text-align: center;
+}
+.list-item__sub {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.list-item__arrow {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+.friend-list-loading {
+  padding: var(--space-6) 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* 系统消息抽屉 */
+.notif-drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  justify-content: flex-end;
+  animation: modal-fade var(--duration-fast) var(--ease-standard);
+}
+.notif-drawer__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+.notif-drawer__panel {
+  position: relative;
+  z-index: 1;
+  width: min(440px, 100vw);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-card);
+  border-left: 1px solid var(--border-default);
+  box-shadow: var(--shadow-floating);
+}
+.notif-drawer__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--border-default);
 }
-.friend-section__title {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
+.notif-drawer__title {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
   color: var(--text-primary);
 }
-.friend-section__count {
-  font-family: var(--font-body);
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-muted);
+.notif-drawer__ops {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.notif-drawer__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 .friend-section__loading {
   padding: var(--space-6) 0;
@@ -561,10 +681,6 @@ async function onDelete(): Promise<void> {
   list-style: none;
   margin: 0;
   padding: 0;
-}
-.notification-list {
-  max-height: 340px;
-  overflow-y: auto;
 }
 .friend-row {
   display: flex;
@@ -826,12 +942,12 @@ async function onDelete(): Promise<void> {
   margin-top: var(--space-5);
 }
 
-@media (max-width: 900px) {
-  .friend-row {
-    flex-wrap: wrap;
+@media (max-width: 640px) {
+  .list-item {
+    padding: var(--space-3);
   }
-  .friend-section {
-    padding: var(--space-2) var(--space-3);
+  .list-item__name {
+    font-size: 13px;
   }
 }
 </style>
