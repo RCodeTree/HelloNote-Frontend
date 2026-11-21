@@ -54,7 +54,7 @@ export const routes: RouteRecordRaw[] = [
     path: '/chats/:userId',
     name: 'chat',
     component: () => import('@/modules/chat/pages/ChatsPage.vue'),
-    meta: { title: '消息', layout: 'default', requiresAuth: true },
+    meta: { title: '消息', layout: 'default', requiresAuth: true, fullBleed: true },
   },
   {
     path: '/profile',
