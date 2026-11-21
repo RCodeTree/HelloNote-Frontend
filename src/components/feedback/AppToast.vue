@@ -62,13 +62,13 @@ function onToastClick(toast: ToastItem): void {
 <style scoped>
 .toast-host {
   position: fixed;
-  left: 16px;
-  bottom: 16px;
-  transform: none;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 200;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
   pointer-events: none;
 }
@@ -177,21 +177,41 @@ function onToastClick(toast: ToastItem): void {
   background: var(--bg-secondary);
 }
 
-/* 出入场动画：左下角滑入 */
-.toast-enter-active,
+/* 跃动弹出：从正上方落入并回弹 */
+.toast-enter-active {
+  animation: toast-drop-in 460ms cubic-bezier(0.18, 0.89, 0.32, 1.28) both;
+}
 .toast-leave-active {
-  transition: opacity var(--duration-base) var(--ease-standard), transform var(--duration-base) var(--ease-standard);
+  transition: opacity 220ms var(--ease-standard), transform 220ms var(--ease-standard);
 }
 .toast-enter-from {
   opacity: 0;
-  transform: translateX(-10px);
 }
 .toast-leave-to {
   opacity: 0;
-  transform: translateX(-6px) scale(0.98);
+  transform: translateY(-12px) scale(0.96);
+}
+@keyframes toast-drop-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-48px) scale(0.9);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(6px) scale(1.02);
+  }
+  80% {
+    transform: translateY(-3px) scale(0.99);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 @media (prefers-reduced-motion: reduce) {
-  .toast-enter-active,
+  .toast-enter-active {
+    animation: none;
+  }
   .toast-leave-active {
     transition: none;
   }
