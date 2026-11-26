@@ -23,6 +23,7 @@ const { friends, loading, error } = storeToRefs(store)
 
 const addOpen = ref(false)
 const keyword = ref('')
+const addMessage = ref('')
 const results = ref<FriendBrief[]>([])
 const searching = ref(false)
 const searched = ref(false)
@@ -101,6 +102,7 @@ function toggleAdd(): void {
   addOpen.value = !addOpen.value
   if (!addOpen.value) {
     keyword.value = ''
+    addMessage.value = ''
     results.value = []
     searched.value = false
   }
@@ -122,11 +124,12 @@ async function addByName(): Promise<void> {
   const name = keyword.value.trim()
   if (!name || adding.value) return
   adding.value = true
-  const ok = await store.add(name)
+  const ok = await store.add(name, addMessage.value)
   adding.value = false
   if (ok) {
     toast.success('已发送申请')
     keyword.value = ''
+    addMessage.value = ''
   } else {
     toast.error(error.value || '添加失败')
   }
@@ -135,10 +138,12 @@ async function addByName(): Promise<void> {
 async function addFromResult(brief: FriendBrief): Promise<void> {
   if (adding.value) return
   adding.value = true
-  const ok = await store.add(brief.username)
+  const ok = await store.add(brief.username, addMessage.value)
   adding.value = false
-  if (ok) toast.success('已发送申请')
-  else toast.error(error.value || '添加失败')
+  if (ok) {
+    toast.success('已发送申请')
+    addMessage.value = ''
+  } else toast.error(error.value || '添加失败')
 }
 
 function clampPos(x: number, y: number): { x: number; y: number } {
@@ -255,6 +260,11 @@ async function menuTogglePin(): Promise<void> {
 
     <section v-if="addOpen" class="friend-add">
       <BaseInput v-model="keyword" placeholder="搜索用户名" class="friend-add__input" />
+      <BaseInput
+        v-model="addMessage"
+        placeholder="申请内容（选填）"
+        class="friend-add__input friend-add__message"
+      />
       <ul v-if="results.length" class="friend-add__results">
         <li v-for="brief in results" :key="brief.id" class="friend-row">
           <UserAvatar :name="brief.displayName" :url="brief.avatarUrl" :size="36" />

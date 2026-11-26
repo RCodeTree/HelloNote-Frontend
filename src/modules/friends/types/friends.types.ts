@@ -28,6 +28,8 @@ export interface Friend {
   unreadCount: number
   /** 是否置顶 */
   isPinned: boolean
+  /** 好友申请留言（收到的申请可查看对方填写的内容） */
+  requestMessage: string
 }
 
 /** 好友设置载荷（前端 camelCase，api 层映射为 snake_case） */

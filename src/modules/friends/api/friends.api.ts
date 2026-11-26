@@ -23,6 +23,7 @@ interface RawFriend {
   closeness?: string | null
   unread_count?: number
   is_pinned?: boolean | null
+  request_message?: string | null
 }
 
 interface RawFriendSettings {
@@ -64,6 +65,7 @@ function mapFriend(r: RawFriend): Friend {
     closeness: toCloseness(r.closeness),
     unreadCount: r.unread_count ?? 0,
     isPinned: !!r.is_pinned,
+    requestMessage: r.request_message ?? '',
   }
 }
 
@@ -86,8 +88,10 @@ export async function fetchRequests(): Promise<Friend[]> {
   return (data ?? []).map(mapFriend)
 }
 
-export async function addFriend(username: string): Promise<Friend> {
-  const { data } = await http.post<RawFriend>('/friends', { username })
+export async function addFriend(username: string, message?: string): Promise<Friend> {
+  const body: { username: string; message?: string } = { username }
+  if (message?.trim()) body.message = message.trim()
+  const { data } = await http.post<RawFriend>('/friends', body)
   return mapFriend(data)
 }
 

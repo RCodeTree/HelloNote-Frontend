@@ -37,12 +37,12 @@ export const useFriendsStore = defineStore('friends', () => {
     }
   }
 
-  async function add(username: string): Promise<boolean> {
+  async function add(username: string, message?: string): Promise<boolean> {
     const trimmed = username.trim()
     if (!trimmed) return false
     error.value = null
     try {
-      await friendsApi.addFriend(trimmed)
+      await friendsApi.addFriend(trimmed, message)
       await loadRequests()
       return true
     } catch (e: any) {

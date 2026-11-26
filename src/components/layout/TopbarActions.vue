@@ -22,7 +22,21 @@ const isHome = computed(() => route.name === 'home')
 
 const open = ref(false)
 const detail = ref<Notification | null>(null)
+// 好友申请详情：摘要 / 详细视图切换
+const detailView = ref<'summary' | 'detail'>('summary')
 const rootEl = ref<HTMLElement | null>(null)
+
+// 好友申请的留言：从通知文案解析（「XX申请添加你为笔友：留言」），兼容关系已处理的情况
+const requestMessage = computed(() => {
+  const n = detail.value
+  if (!n || n.type !== 'friend_request') return ''
+  const sep = n.content.indexOf('：')
+  const fromContent = sep >= 0 ? n.content.slice(sep + 1).trim() : ''
+  if (fromContent) return fromContent
+  // 回退：从申请记录按 friendship id 匹配
+  const req = friendsStore.requests.find((r) => r.id === n.relatedId)
+  return req?.requestMessage?.trim() ?? ''
+})
 
 const icon: Record<NotificationType, IconName> = {
   system: 'info',
@@ -55,7 +69,24 @@ function toggle(): void {
 function openDetail(n: Notification): void {
   if (!n.isRead) void store.markRead(n.id)
   open.value = false
+  detailView.value = 'summary'
   detail.value = n
+  // 好友申请详情需要申请留言，确保申请记录已加载
+  if (n.type === 'friend_request') void friendsStore.loadRequests()
+}
+
+function showDetail(): void {
+  if (!detail.value) return
+  // 好友申请在模态框内切换到详细视图；其它类型仍跳转目标
+  if (detail.value.type === 'friend_request') {
+    detailView.value = 'detail'
+    return
+  }
+  goDetailTarget()
+}
+
+function showSummary(): void {
+  detailView.value = 'summary'
 }
 
 function detailTarget(): string | null {
@@ -197,21 +228,47 @@ onBeforeUnmount(() => {
               <UserAvatar :name="detail.actorName" :url="detail.actorAvatar" :size="30" />
               <span>{{ detail.actorName }}</span>
             </div>
-            <p class="detail-modal__content">{{ detail.content }}</p>
+            <template v-if="detail.type === 'friend_request' && detailView === 'detail'">
+              <p class="detail-modal__section-label">申请内容</p>
+              <p class="detail-modal__content" :class="{ 'is-placeholder': !requestMessage }">
+                {{ requestMessage || '对方未填写申请内容' }}
+              </p>
+            </template>
+            <p v-else class="detail-modal__content">{{ detail.content }}</p>
           </div>
           <footer class="detail-modal__foot">
-            <div v-if="detail.type === 'friend_request' && detail.relatedId !== null" class="detail-modal__ops">
-              <BaseButton
-                variant="primary"
-                size="sm"
-                :loading="acceptingId === detail.id"
-                @click="acceptRequest(detail)"
-              >
-                接受
-              </BaseButton>
-              <BaseButton variant="ghost" size="sm" @click="ignoreRequest(detail)">忽略</BaseButton>
-            </div>
-            <BaseButton v-if="detailTarget()" variant="ghost" size="sm" @click="goDetailTarget">
+            <!-- 好友申请 - 详细视图：返回 + 同意/拒绝 -->
+            <template v-if="detail.type === 'friend_request' && detailView === 'detail'">
+              <BaseButton variant="ghost" size="sm" @click="showSummary">返回</BaseButton>
+              <div v-if="detail.relatedId !== null" class="detail-modal__ops">
+                <BaseButton
+                  variant="primary"
+                  size="sm"
+                  :loading="acceptingId === detail.id"
+                  @click="acceptRequest(detail)"
+                >
+                  同意
+                </BaseButton>
+                <BaseButton variant="ghost" size="sm" @click="ignoreRequest(detail)">拒绝</BaseButton>
+              </div>
+            </template>
+            <!-- 好友申请 - 摘要视图：查看详情 + 快捷接受/忽略 -->
+            <template v-else-if="detail.type === 'friend_request'">
+              <BaseButton variant="ghost" size="sm" @click="showDetail">查看详情</BaseButton>
+              <div v-if="detail.relatedId !== null" class="detail-modal__ops">
+                <BaseButton
+                  variant="primary"
+                  size="sm"
+                  :loading="acceptingId === detail.id"
+                  @click="acceptRequest(detail)"
+                >
+                  接受
+                </BaseButton>
+                <BaseButton variant="ghost" size="sm" @click="ignoreRequest(detail)">忽略</BaseButton>
+              </div>
+            </template>
+            <!-- 其它通知：跳转目标 -->
+            <BaseButton v-else-if="detailTarget()" variant="ghost" size="sm" @click="goDetailTarget">
               查看详情
             </BaseButton>
           </footer>
@@ -477,6 +534,12 @@ onBeforeUnmount(() => {
   font-weight: 600;
   color: var(--text-secondary);
 }
+.detail-modal__section-label {
+  margin: 0 0 var(--space-2);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
 .detail-modal__content {
   margin: 0;
   font-size: 14px;
@@ -484,6 +547,10 @@ onBeforeUnmount(() => {
   color: var(--text-primary);
   white-space: pre-wrap;
   word-break: break-word;
+}
+.detail-modal__content.is-placeholder {
+  color: var(--text-muted);
+  font-style: italic;
 }
 .detail-modal__foot {
   display: flex;
