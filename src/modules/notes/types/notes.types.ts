@@ -15,6 +15,23 @@ export interface Note {
   content: string
   format: NoteFormat
   isPinned: boolean
+  isPublic: boolean
+  createdAt: string
+  updatedAt: string
+  tags: Tag[]
+}
+
+/** 公开笔记（广场/笔友主页卡片）：含作者与互动计数 */
+export interface PublicNote {
+  id: number
+  title: string
+  excerpt: string
+  format: NoteFormat
+  authorId: number
+  authorName: string
+  authorAvatar: string | null
+  likeCount: number
+  commentCount: number
   createdAt: string
   updatedAt: string
   tags: Tag[]
@@ -25,6 +42,7 @@ export interface NoteCreatePayload {
   content: string
   format: NoteFormat
   isPinned: boolean
+  isPublic?: boolean
   tagIds: number[]
 }
 
@@ -33,5 +51,6 @@ export interface NoteUpdatePayload {
   content?: string
   format?: NoteFormat
   isPinned?: boolean
+  isPublic?: boolean
   tagIds?: number[]
 }

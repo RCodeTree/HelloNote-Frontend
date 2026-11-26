@@ -8,7 +8,7 @@ import { useCommentStore } from '../stores/comment.store'
 const props = defineProps<{ noteId: number }>()
 
 const store = useCommentStore()
-const { commentsByNote, likeByNote, likingByNote, error } = storeToRefs(store)
+const { commentsByNote, likeByNote, likingByNote, commentReadBaseByNote, error } = storeToRefs(store)
 
 // 评论悬浮框展开状态（点赞改为按钮直接切换，无浮层）
 const commentsOpen = ref(false)
@@ -20,15 +20,46 @@ const likeState = computed(
 )
 const liking = computed(() => likingByNote.value[props.noteId] === true)
 
+// 未读新评论数：当前评论数 - 已读基线；无未读则不显示角标
+const unreadComments = computed(() => {
+  const list = comments.value
+  const base = commentReadBaseByNote.value[props.noteId] ?? list.length
+  return Math.max(0, list.length - base)
+})
+
+// 浮层关闭时轮询评论，新评论到达即出现未读角标
+let pollTimer: number | undefined
+
+function startPoll(): void {
+  stopPoll()
+  pollTimer = window.setInterval(() => {
+    if (!commentsOpen.value) void store.load(props.noteId)
+  }, 10000)
+}
+
+function stopPoll(): void {
+  if (pollTimer !== undefined) {
+    clearInterval(pollTimer)
+    pollTimer = undefined
+  }
+}
+
 watch(
   () => props.noteId,
   (id) => {
     commentsOpen.value = false
     void store.load(id)
     void store.loadLike(id)
+    startPoll()
   },
   { immediate: true },
 )
+
+// 打开评论浮层即视为已读，未读角标清零
+function toggleComments(): void {
+  commentsOpen.value = !commentsOpen.value
+  if (commentsOpen.value) store.markCommentsRead(props.noteId)
+}
 
 function close(): void {
   commentsOpen.value = false
@@ -54,22 +85,23 @@ onMounted(() => {
 onBeforeUnmount(() => {
   document.removeEventListener('click', onDocClick)
   document.removeEventListener('keydown', onKeydown)
+  stopPoll()
 })
 </script>
 
 <template>
   <div ref="rootEl" class="social">
-    <!-- 评论图标：带数量角标。点击展开评论悬浮框 -->
+    <!-- 评论图标：仅在有未读新评论时显示角标。点击展开评论悬浮框 -->
     <button
       type="button"
       class="social__btn"
       :class="{ 'is-active': commentsOpen }"
       :title="commentsOpen ? '收起评论' : '评论'"
       :aria-expanded="commentsOpen"
-      @click.stop="commentsOpen = !commentsOpen"
+      @click.stop="toggleComments"
     >
       <AppIcon name="message" :size="18" />
-      <span v-if="comments.length" class="social__badge">{{ comments.length }}</span>
+      <span v-if="unreadComments" class="social__badge">{{ unreadComments }}</span>
     </button>
 
     <!-- 点赞图标：直接点击切换点赞/取消，带数量角标 -->

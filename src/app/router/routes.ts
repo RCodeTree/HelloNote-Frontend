@@ -28,10 +28,22 @@ export const routes: RouteRecordRaw[] = [
     meta: { title: '笔记', layout: 'default', requiresAuth: true },
   },
   {
+    path: '/notes/square',
+    name: 'notes-square',
+    component: () => import('@/modules/notes/pages/NotesSquarePage.vue'),
+    meta: { title: '笔记广场', layout: 'default', requiresAuth: true },
+  },
+  {
     path: '/notes/new',
     name: 'note-new',
     component: () => import('@/modules/notes/pages/NotesEditorPage.vue'),
     meta: { title: '新建笔记', layout: 'default', requiresAuth: true, fullBleed: true },
+  },
+  {
+    path: '/notes/:id/view',
+    name: 'note-public',
+    component: () => import('@/modules/notes/pages/NotePublicPage.vue'),
+    meta: { title: '公开笔记', layout: 'default', requiresAuth: true },
   },
   {
     path: '/notes/:id/edit',

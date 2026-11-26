@@ -10,6 +10,9 @@ import UserAvatar from '@/components/common/UserAvatar.vue'
 import EmptyState from '@/components/feedback/EmptyState.vue'
 import { useToast } from '@/composables/useToast'
 import { useFriendsStore } from '../stores/friends.store'
+import { fetchUserPublicNotes } from '@/modules/notes/api/notes.api'
+import PublicNoteCard from '@/modules/notes/components/PublicNoteCard.vue'
+import type { PublicNote } from '@/modules/notes/types/notes.types'
 import type { FriendCloseness, FriendPrivacy } from '../types/friends.types'
 
 const route = useRoute()
@@ -31,6 +34,8 @@ const privacy = ref<FriendPrivacy>('all')
 const closeness = ref<FriendCloseness>('acquaintance')
 const saving = ref(false)
 const deleteOpen = ref(false)
+const publicNotes = ref<PublicNote[]>([])
+const publicNotesLoading = ref(false)
 
 const privacyLabel: Record<FriendPrivacy, string> = {
   all: '公开',
@@ -54,12 +59,25 @@ watch(
     relationType.value = f.relationType
     privacy.value = f.privacy
     closeness.value = f.closeness
+    void loadPublicNotes(f.userId)
   },
   { immediate: true },
 )
 
+async function loadPublicNotes(uid: number): Promise<void> {
+  publicNotesLoading.value = true
+  try {
+    publicNotes.value = await fetchUserPublicNotes(uid, 30)
+  } catch {
+    publicNotes.value = []
+  } finally {
+    publicNotesLoading.value = false
+  }
+}
+
 onMounted(async () => {
   if (!friends.value.length || !friend.value) await store.init()
+  if (friend.value) void loadPublicNotes(friend.value.userId)
 })
 
 async function save(): Promise<void> {
@@ -153,6 +171,20 @@ async function onDelete(): Promise<void> {
           <span>删除笔友</span>
         </BaseButton>
       </section>
+
+      <section class="profile-notes">
+        <h2 class="profile-notes__title">TA 的公开笔记</h2>
+        <div v-if="publicNotesLoading" class="profile-notes__loading">加载中…</div>
+        <p v-else-if="!publicNotes.length" class="profile-notes__empty">TA 还没有公开笔记</p>
+        <div v-else class="profile-notes__grid">
+          <PublicNoteCard
+            v-for="n in publicNotes"
+            :key="n.id"
+            :note="n"
+            :show-author="false"
+          />
+        </div>
+      </section>
     </template>
 
     <ConfirmDialog :open="deleteOpen" title="删除笔友" message="删除后将移除这段笔友关系" confirm-text="删除" danger @confirm="onDelete"
@@ -167,6 +199,28 @@ async function onDelete(): Promise<void> {
   gap: var(--space-5);
   max-width: 560px;
   margin: 0 auto;
+}
+.profile-notes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.profile-notes__title {
+  margin: 0;
+  font-size: 16px;
+  color: var(--text-primary);
+}
+.profile-notes__loading,
+.profile-notes__empty {
+  padding: var(--space-4) 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+}
+.profile-notes__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-3);
 }
 
 .profile-page__head {

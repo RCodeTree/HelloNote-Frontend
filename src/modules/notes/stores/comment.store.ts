@@ -11,17 +11,30 @@ export const useCommentStore = defineStore('noteComments', () => {
   const loadingByNote = ref<Record<number, boolean>>({})
   const likingByNote = ref<Record<number, boolean>>({})
   const error = ref<string | null>(null)
+  // 各笔记的评论已读基线：未读新评论数 = 当前评论数 - 基线
+  const commentReadBaseByNote = ref<Record<number, number>>({})
 
   async function load(noteId: number): Promise<void> {
     loadingByNote.value = { ...loadingByNote.value, [noteId]: true }
     error.value = null
     try {
-      commentsByNote.value = { ...commentsByNote.value, [noteId]: await commentApi.fetchComments(noteId) }
+      const list = await commentApi.fetchComments(noteId)
+      commentsByNote.value = { ...commentsByNote.value, [noteId]: list }
+      // 首次加载建立已读基线；之后新增的评论即视为未读
+      if (!(noteId in commentReadBaseByNote.value)) {
+        commentReadBaseByNote.value = { ...commentReadBaseByNote.value, [noteId]: list.length }
+      }
     } catch (e: any) {
       error.value = e?.response?.data?.detail || '加载评论失败'
     } finally {
       loadingByNote.value = { ...loadingByNote.value, [noteId]: false }
     }
+  }
+
+  /** 标记评论已读：把当前评论数设为基线，未读角标清零 */
+  function markCommentsRead(noteId: number): void {
+    const list = commentsByNote.value[noteId] ?? []
+    commentReadBaseByNote.value = { ...commentReadBaseByNote.value, [noteId]: list.length }
   }
 
   async function add(noteId: number, payload: CommentCreatePayload): Promise<Comment | null> {
@@ -79,11 +92,13 @@ export const useCommentStore = defineStore('noteComments', () => {
     likeByNote,
     loadingByNote,
     likingByNote,
+    commentReadBaseByNote,
     error,
     load,
     add,
     remove,
     loadLike,
     toggleLike,
+    markCommentsRead,
   }
 })

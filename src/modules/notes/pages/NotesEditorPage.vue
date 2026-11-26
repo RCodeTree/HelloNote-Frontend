@@ -33,6 +33,7 @@ const form = reactive({
   content: '',
   format: 'markdown' as NoteFormat,
   isPinned: false,
+  isPublic: false,
   tagIds: [] as number[],
 })
 
@@ -54,12 +55,14 @@ function fillFromNote(note: {
   content: string
   format?: NoteFormat
   isPinned: boolean
+  isPublic?: boolean
   tags: { id: number }[]
 }): void {
   form.title = note.title
   form.content = note.content
   form.format = note.format ?? 'markdown'
   form.isPinned = note.isPinned
+  form.isPublic = note.isPublic ?? false
   form.tagIds = note.tags.map((t) => t.id)
   // 纯文本笔记不应停留在预览态
   showPreview.value = form.format === 'markdown' ? showPreview.value : false
@@ -71,6 +74,7 @@ function resetForm(): void {
   form.content = ''
   form.format = 'markdown'
   form.isPinned = false
+  form.isPublic = false
   form.tagIds = []
   showPreview.value = false
   takeSnapshot()
@@ -146,6 +150,7 @@ async function onSave(): Promise<void> {
     content: form.content,
     format: form.format,
     isPinned: form.isPinned,
+    isPublic: form.isPublic,
     tagIds: form.tagIds,
   }
   if (isEdit.value && noteId.value !== null) {
@@ -189,6 +194,10 @@ async function onDelete(): Promise<void> {
 
 function togglePinLocal(): void {
   form.isPinned = !form.isPinned
+}
+
+function togglePublicLocal(): void {
+  form.isPublic = !form.isPublic
 }
 
 // —— 导出笔记到本地：生成文件 → Blob → 浏览器原生「另存为」对话框（用户自行选择保存路径） ——
@@ -512,6 +521,14 @@ function formatDate(value: string | undefined): string {
           @click="togglePinLocal"
         >
           <AppIcon name="pin" :size="17" />
+        </button>
+        <button
+          class="editor__iconbtn"
+          :class="{ 'is-active': form.isPublic }"
+          :title="form.isPublic ? '设为私密' : '公开到笔记广场'"
+          @click="togglePublicLocal"
+        >
+          <AppIcon name="eye" :size="17" />
         </button>
         <button v-if="isEdit" class="editor__iconbtn editor__iconbtn--danger" title="删除笔记" @click="requestDelete">
           <AppIcon name="trash" :size="17" />

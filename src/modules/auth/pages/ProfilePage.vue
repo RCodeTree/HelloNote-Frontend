@@ -25,6 +25,26 @@ const nameError = ref<string | null>(null)
 const uploadError = ref<string | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const previewUrl = ref<string | null>(null)
+// 头像灯箱预览：点击头像查看大图
+const viewerOpen = ref(false)
+
+function openViewer(): void {
+  if (!avatarUrl.value) return
+  viewerOpen.value = true
+}
+
+function closeViewer(): void {
+  viewerOpen.value = false
+}
+
+function onViewerKeydown(e: KeyboardEvent): void {
+  if (e.key === 'Escape') closeViewer()
+}
+
+watch(viewerOpen, (open) => {
+  if (open) document.addEventListener('keydown', onViewerKeydown)
+  else document.removeEventListener('keydown', onViewerKeydown)
+})
 
 watch(
   () => auth.user,
@@ -114,6 +134,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
+  document.removeEventListener('keydown', onViewerKeydown)
 })
 </script>
 
@@ -130,13 +151,18 @@ onBeforeUnmount(() => {
       <!-- 左栏：资料卡 -->
       <section class="panel profile-card">
         <div class="profile-card__identity">
-          <button type="button" class="profile-card__avatar-btn" aria-label="更换头像" @click="pickFile">
+          <button
+            type="button"
+            class="profile-card__avatar-btn"
+            aria-label="查看头像"
+            title="点击查看头像"
+            @click="openViewer"
+          >
             <UserAvatar
               :name="form.displayName || auth.user?.username || '?'"
               :url="avatarUrl"
               :size="88"
             />
-            <span class="profile-card__avatar-badge"><AppIcon name="upload" :size="14" /></span>
           </button>
           <div class="profile-card__names">
             <p class="profile-card__display">{{ auth.user?.displayName || '—' }}</p>
@@ -171,18 +197,14 @@ onBeforeUnmount(() => {
             />
           </div>
 
-          <div class="profile-card__avatar-row">
-            <span class="profile-card__label">头像</span>
-            <BaseButton variant="secondary" size="sm" :disabled="auth.loading" @click="pickFile">
-              <AppIcon name="upload" :size="15" />
-              更换头像
-            </BaseButton>
-          </div>
-
           <p v-if="uploadError" class="profile-card__error">{{ uploadError }}</p>
           <p v-else-if="auth.error" class="profile-card__error">{{ auth.error }}</p>
 
           <div class="profile-card__actions">
+            <BaseButton variant="secondary" size="sm" :disabled="auth.loading" @click="pickFile">
+              <AppIcon name="upload" :size="15" />
+              更换头像
+            </BaseButton>
             <BaseButton variant="primary" :loading="auth.loading" @click="onSave">保存</BaseButton>
           </div>
         </div>
@@ -263,6 +285,21 @@ onBeforeUnmount(() => {
         </section>
       </div>
     </div>
+
+    <!-- 头像灯箱预览 -->
+    <Teleport to="body">
+      <Transition name="viewer">
+        <div v-if="viewerOpen" class="avatar-viewer" @click.self="closeViewer">
+          <img
+            v-if="avatarUrl"
+            :src="avatarUrl"
+            :alt="form.displayName || '头像'"
+            class="avatar-viewer__img"
+          />
+          <p v-else class="avatar-viewer__placeholder">暂未设置头像</p>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -339,24 +376,14 @@ onBeforeUnmount(() => {
   border: none;
   border-radius: var(--radius-full);
   background: transparent;
-  cursor: pointer;
+  cursor: zoom-in;
+  transition: transform var(--duration-fast) var(--ease-standard);
+}
+.profile-card__avatar-btn:hover {
+  transform: scale(1.03);
 }
 .profile-card__avatar-btn :deep(.user-avatar) {
   box-shadow: 0 0 0 3px var(--bg-card), 0 0 0 4px var(--border-default);
-}
-.profile-card__avatar-badge {
-  position: absolute;
-  right: -2px;
-  bottom: -2px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: var(--radius-full);
-  border: 2px solid var(--bg-card);
-  background: var(--accent-primary);
-  color: var(--bg-card);
 }
 .profile-card__names {
   min-width: 0;
@@ -429,19 +456,15 @@ onBeforeUnmount(() => {
   border-color: var(--accent-primary);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 20%, transparent);
 }
-.profile-card__avatar-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
 .profile-card__error {
   font-size: 13px;
   color: var(--danger);
 }
 .profile-card__actions {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
 }
 .profile-card__meta {
   display: flex;
@@ -562,6 +585,47 @@ onBeforeUnmount(() => {
   color: var(--text-muted);
   padding: var(--space-6) 0;
   text-align: center;
+}
+
+/* ===== 头像灯箱 ===== */
+.avatar-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6);
+  background: rgb(0 0 0 / 72%);
+  cursor: zoom-out;
+}
+.avatar-viewer__img {
+  /* 固定展示宽度：小图（如占位头像）也放大可看，大图按比例缩放不溢出 */
+  width: min(70vw, 420px);
+  height: auto;
+  max-height: min(80vh, 520px);
+  object-fit: contain;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-floating);
+  background: var(--bg-secondary);
+}
+.avatar-viewer__placeholder {
+  color: #fff;
+  font-size: 14px;
+}
+.viewer-enter-active,
+.viewer-leave-active {
+  transition: opacity 200ms var(--ease-standard);
+}
+.viewer-enter-from,
+.viewer-leave-to {
+  opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .viewer-enter-active,
+  .viewer-leave-active {
+    transition: none;
+  }
 }
 
 @media (max-width: 900px) {
