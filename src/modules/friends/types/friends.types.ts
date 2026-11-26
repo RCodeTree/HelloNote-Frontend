@@ -30,6 +30,8 @@ export interface Friend {
   isPinned: boolean
   /** 好友申请留言（收到的申请可查看对方填写的内容） */
   requestMessage: string
+  /** 最后活跃时间（在线状态判定依据） */
+  lastActiveAt: string | null
 }
 
 /** 好友设置载荷（前端 camelCase，api 层映射为 snake_case） */

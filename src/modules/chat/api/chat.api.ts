@@ -7,6 +7,7 @@ interface RawPeer {
   username: string | null
   display_name: string | null
   avatar_url: string | null
+  last_active_at?: string | null
 }
 
 interface RawConversation {
@@ -33,6 +34,7 @@ function mapPeer(r: RawPeer): ChatPeer {
     username: r.username ?? '',
     displayName: r.display_name || r.username || '匿名',
     avatarUrl: r.avatar_url ?? null,
+    lastActiveAt: r.last_active_at ?? null,
   }
 }
 

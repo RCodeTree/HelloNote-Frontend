@@ -24,6 +24,7 @@ interface RawFriend {
   unread_count?: number
   is_pinned?: boolean | null
   request_message?: string | null
+  last_active_at?: string | null
 }
 
 interface RawFriendSettings {
@@ -66,6 +67,7 @@ function mapFriend(r: RawFriend): Friend {
     unreadCount: r.unread_count ?? 0,
     isPinned: !!r.is_pinned,
     requestMessage: r.request_message ?? '',
+    lastActiveAt: r.last_active_at ?? null,
   }
 }
 

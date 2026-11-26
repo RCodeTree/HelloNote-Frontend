@@ -5,6 +5,8 @@ export interface ChatPeer {
   username: string
   displayName: string
   avatarUrl: string | null
+  /** 最后活跃时间（在线状态判定依据） */
+  lastActiveAt: string | null
 }
 
 export interface Conversation {

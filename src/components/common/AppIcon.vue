@@ -50,6 +50,7 @@ import {
   Bell,
   Info,
   BookOpen,
+  Reply as ReplyIcon,
 } from 'lucide-vue-next'
 import type { Component } from 'vue'
 
@@ -104,6 +105,7 @@ export type IconName =
   | 'bell'
   | 'info'
   | 'book-open'
+  | 'reply'
 
 const props = withDefaults(
   defineProps<{
@@ -168,6 +170,7 @@ const iconMap: Record<IconName, Component> = {
   bell: Bell,
   info: Info,
   'book-open': BookOpen,
+  reply: ReplyIcon,
 }
 
 const Icon = iconMap[props.name]

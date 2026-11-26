@@ -41,6 +41,7 @@ const requestMessage = computed(() => {
 const icon: Record<NotificationType, IconName> = {
   system: 'info',
   comment: 'message',
+  reply: 'reply',
   like: 'heart',
   friend_request: 'user-plus',
   friend_accept: 'check',
@@ -48,6 +49,7 @@ const icon: Record<NotificationType, IconName> = {
 const label: Record<NotificationType, string> = {
   system: '系统',
   comment: '评论',
+  reply: '回复',
   like: '点赞',
   friend_request: '好友申请',
   friend_accept: '好友通过',
@@ -93,7 +95,7 @@ function detailTarget(): string | null {
   const n = detail.value
   if (!n) return null
   if (n.type === 'friend_request' || n.type === 'friend_accept') return '/friends'
-  if (n.relatedId !== null && (n.type === 'comment' || n.type === 'like')) {
+  if (n.relatedId !== null && (n.type === 'comment' || n.type === 'reply' || n.type === 'like')) {
     return `/notes/${n.relatedId}/edit`
   }
   return null
@@ -399,6 +401,10 @@ onBeforeUnmount(() => {
   background: color-mix(in srgb, var(--accent-primary) 14%, transparent);
   color: var(--accent-primary);
 }
+.notify-item__icon--reply {
+  background: color-mix(in srgb, var(--accent-olive) 16%, transparent);
+  color: var(--accent-olive);
+}
 .notify-item__icon--like {
   background: color-mix(in srgb, var(--accent-danger) 14%, transparent);
   color: var(--accent-danger);
@@ -482,6 +488,10 @@ onBeforeUnmount(() => {
 .detail-modal__icon--friend_accept {
   background: color-mix(in srgb, var(--accent-primary) 14%, transparent);
   color: var(--accent-primary);
+}
+.detail-modal__icon--reply {
+  background: color-mix(in srgb, var(--accent-olive) 16%, transparent);
+  color: var(--accent-olive);
 }
 .detail-modal__icon--like {
   background: color-mix(in srgb, var(--accent-danger) 14%, transparent);

@@ -21,6 +21,7 @@ interface RawOk {
 function toType(value: string | null | undefined): NotificationType {
   switch (value) {
     case 'comment':
+    case 'reply':
     case 'like':
     case 'friend_request':
     case 'friend_accept':
