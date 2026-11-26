@@ -10,8 +10,8 @@ const props = defineProps<{ noteId: number }>()
 const store = useCommentStore()
 const { commentsByNote, likeByNote, likingByNote, error } = storeToRefs(store)
 
-// 同一时刻只展开一个悬浮框：'comments' | 'likes' | null
-const openPanel = ref<'comments' | 'likes' | null>(null)
+// 评论悬浮框展开状态（点赞改为按钮直接切换，无浮层）
+const commentsOpen = ref(false)
 const rootEl = ref<HTMLElement | null>(null)
 
 const comments = computed(() => commentsByNote.value[props.noteId] ?? [])
@@ -23,22 +23,20 @@ const liking = computed(() => likingByNote.value[props.noteId] === true)
 watch(
   () => props.noteId,
   (id) => {
-    openPanel.value = null
+    commentsOpen.value = false
     void store.load(id)
     void store.loadLike(id)
   },
   { immediate: true },
 )
 
-function toggle(panel: 'comments' | 'likes'): void {
-  openPanel.value = openPanel.value === panel ? null : panel
-}
-
 function close(): void {
-  openPanel.value = null
+  commentsOpen.value = false
 }
 
 async function onLike(): Promise<void> {
+  // 点赞直接切换（再次点击取消），带防抖避免重复请求
+  if (liking.value) return
   await store.toggleLike(props.noteId)
 }
 
@@ -61,57 +59,40 @@ onBeforeUnmount(() => {
 
 <template>
   <div ref="rootEl" class="social">
-    <!-- 评论图标：带未读数量角标。点击展开评论悬浮框 -->
+    <!-- 评论图标：带数量角标。点击展开评论悬浮框 -->
     <button
       type="button"
       class="social__btn"
-      :class="{ 'is-active': openPanel === 'comments' }"
-      :title="openPanel === 'comments' ? '收起评论' : '评论'"
-      :aria-expanded="openPanel === 'comments'"
-      @click.stop="toggle('comments')"
+      :class="{ 'is-active': commentsOpen }"
+      :title="commentsOpen ? '收起评论' : '评论'"
+      :aria-expanded="commentsOpen"
+      @click.stop="commentsOpen = !commentsOpen"
     >
       <AppIcon name="message" :size="18" />
       <span v-if="comments.length" class="social__badge">{{ comments.length }}</span>
     </button>
 
-    <!-- 点赞图标：已点赞高亮填充，带点赞数角标。点击展开点赞悬浮框 -->
+    <!-- 点赞图标：直接点击切换点赞/取消，带数量角标 -->
     <button
       type="button"
       class="social__btn social__btn--like"
-      :class="{ 'is-active': openPanel === 'likes', 'is-liked': likeState.likedByMe }"
-      :title="openPanel === 'likes' ? '收起点赞' : '点赞'"
-      :aria-expanded="openPanel === 'likes'"
-      @click.stop="toggle('likes')"
+      :class="{ 'is-liked': likeState.likedByMe }"
+      :title="likeState.likedByMe ? '取消点赞' : '点赞'"
+      :disabled="liking"
+      @click.stop="onLike"
     >
       <AppIcon name="heart" :size="18" />
       <span v-if="likeState.likeCount" class="social__badge">{{ likeState.likeCount }}</span>
     </button>
 
-    <!-- 评论悬浮框 -->
-    <Transition name="pop">
-      <div v-if="openPanel === 'comments'" class="social__pop social__pop--comments" @click.stop>
+    <!-- 评论悬浮框：跃动弹出 -->
+    <Transition name="comment-pop">
+      <div v-if="commentsOpen" class="social__pop social__pop--comments" @click.stop>
         <NoteComments :note-id="noteId" />
       </div>
     </Transition>
 
-    <!-- 点赞悬浮框 -->
-    <Transition name="pop">
-      <div v-if="openPanel === 'likes'" class="social__pop social__pop--likes" @click.stop>
-        <button
-          type="button"
-          class="like-pop__main"
-          :class="{ 'is-liked': likeState.likedByMe }"
-          :disabled="liking"
-          @click="onLike"
-        >
-          <AppIcon name="heart" :size="26" />
-          <span class="like-pop__count">{{ likeState.likeCount }}</span>
-        </button>
-        <p class="like-pop__label">{{ likeState.likedByMe ? '已点赞' : '点赞' }}</p>
-      </div>
-    </Transition>
-
-    <p v-if="error && openPanel" class="social__error">{{ error }}</p>
+    <p v-if="error && commentsOpen" class="social__error">{{ error }}</p>
   </div>
 </template>
 
@@ -188,54 +169,46 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transform-origin: top right;
 }
-.social__pop--likes {
-  width: 160px;
-  padding: var(--space-5);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-2);
+/* 评论浮层跃动弹出：从上方落下并回弹 */
+.comment-pop-enter-active {
+  animation: comment-pop-in 420ms cubic-bezier(0.18, 0.89, 0.32, 1.28) both;
 }
-.like-pop__main {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  width: 100%;
-  padding: var(--space-3);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all var(--duration-fast) var(--ease-standard);
+.comment-pop-leave-active {
+  transition: opacity 180ms var(--ease-standard), transform 180ms var(--ease-standard);
 }
-.like-pop__main:hover:not(:disabled) {
-  border-color: var(--accent-danger);
-  color: var(--accent-danger);
+.comment-pop-enter-from {
+  opacity: 0;
 }
-.like-pop__main.is-liked {
-  color: var(--accent-danger);
-  border-color: color-mix(in srgb, var(--accent-danger) 45%, transparent);
-  background: color-mix(in srgb, var(--accent-danger) 10%, transparent);
+.comment-pop-leave-to {
+  opacity: 0;
+  transform: translateY(-8px) scale(0.97);
 }
-.like-pop__main.is-liked :deep(.app-icon) {
-  fill: currentColor;
+@keyframes comment-pop-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-18px) scale(0.94);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(4px) scale(1.01);
+  }
+  80% {
+    transform: translateY(-2px) scale(0.995);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
-.like-pop__main:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-.like-pop__count {
-  font-size: 18px;
-  font-weight: 600;
-  font-family: var(--font-display);
-}
-.like-pop__label {
-  margin: 0;
-  font-size: 12px;
-  color: var(--text-muted);
+@media (prefers-reduced-motion: reduce) {
+  .comment-pop-enter-active {
+    animation: none;
+  }
+  .comment-pop-leave-active {
+    transition: none;
+  }
 }
 .social__error {
   position: absolute;

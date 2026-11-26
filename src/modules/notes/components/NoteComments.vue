@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import AppIcon from '@/components/common/AppIcon.vue'
 import BaseButton from '@/components/common/BaseButton.vue'
@@ -22,6 +22,17 @@ const draft = ref('')
 const replyTo = ref<number | null>(null)
 const submitting = ref(false)
 const deletingId = ref<number | null>(null)
+const textareaEl = ref<HTMLTextAreaElement | null>(null)
+
+// 聚焦输入框并把光标移到末尾；滚动到可见，方便长列表里回复
+function focusInput(): void {
+  const el = textareaEl.value
+  if (!el) return
+  el.focus()
+  const end = el.value.length
+  el.setSelectionRange(end, end)
+  el.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+}
 
 watch(
   () => props.noteId,
@@ -54,10 +65,12 @@ function parentName(parentId: number | null): string {
 function beginReply(comment: Comment): void {
   replyTo.value = comment.id
   draft.value = ''
+  void nextTick(focusInput)
 }
 
 function cancelReply(): void {
   replyTo.value = null
+  void nextTick(focusInput)
 }
 
 async function submit(): Promise<void> {
@@ -69,6 +82,7 @@ async function submit(): Promise<void> {
   if (created) {
     draft.value = ''
     replyTo.value = null
+    void nextTick(focusInput)
   } else {
     toast.error(error.value || '发送失败')
   }
@@ -118,10 +132,11 @@ async function onDelete(id: number): Promise<void> {
         <button type="button" class="comments__replycancel" @click="cancelReply">取消</button>
       </div>
       <textarea
+        ref="textareaEl"
         v-model="draft"
         class="comments__textarea"
         rows="3"
-        placeholder="写下评论"
+        :placeholder="replyTo !== null ? `回复 @${parentName(replyTo)}` : '写下评论'"
         :disabled="submitting"
         @keydown.ctrl.enter.prevent="submit"
         @keydown.meta.enter.prevent="submit"
