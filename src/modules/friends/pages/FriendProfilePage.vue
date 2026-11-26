@@ -97,7 +97,8 @@ async function onDelete(): Promise<void> {
     return
   }
   toast.success('已删除')
-  router.back()
+  // 笔友已删除，统一回笔友列表；用 replace 避免返回键回到已删对象的页面
+  await router.replace('/friends')
 }
 </script>
 
