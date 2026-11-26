@@ -117,10 +117,18 @@ function scrollToBottom(): void {
   if (el) el.scrollTop = el.scrollHeight
 }
 
+// 输入框主动聚焦：进入会话/发送消息后自动获取焦点，用户点别处才失焦
+function focusInput(): void {
+  inputEl.value?.focus()
+}
+
 async function selectConversation(conv: Conversation): Promise<void> {
   activeId.value = conv.id
   draft.value = ''
-  await nextTick(scrollToBottom)
+  await nextTick(() => {
+    scrollToBottom()
+    focusInput()
+  })
 }
 
 async function submit(): Promise<void> {

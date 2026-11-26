@@ -168,7 +168,8 @@ const wide = computed(() => route.meta.wide === true)
   .app-shell__topbar {
     padding: var(--space-3) var(--content-gutter) 0;
   }
-  .app-shell__content {
+  /* 全幅页（聊天/编辑器）须保持 padding:0，否则两侧留白，header/输入区不铺满 */
+  .app-shell__content:not(.app-shell__content--full) {
     padding: var(--space-5) var(--content-gutter) var(--space-6);
   }
 }
