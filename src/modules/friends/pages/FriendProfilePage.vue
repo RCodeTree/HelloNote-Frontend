@@ -116,7 +116,7 @@ async function onDelete(): Promise<void> {
         <UserAvatar :name="friend.note || friend.displayName" :url="friend.avatarUrl" :size="72" />
         <h1 class="profile-hero__name">{{ friend.note || friend.displayName }}</h1>
         <span v-if="friend.note && friend.note !== friend.displayName" class="profile-hero__origin">
-          原昵称：{{ friend.displayName }}
+          昵称：{{ friend.displayName }}
         </span>
         <span class="profile-hero__username">@{{ friend.username }}</span>
         <p v-if="friend.bio" class="profile-hero__bio">{{ friend.bio }}</p>
@@ -154,15 +154,8 @@ async function onDelete(): Promise<void> {
       </section>
     </template>
 
-    <ConfirmDialog
-      :open="deleteOpen"
-      title="删除笔友"
-      message="删除后将移除这段笔友关系"
-      confirm-text="删除"
-      danger
-      @confirm="onDelete"
-      @cancel="deleteOpen = false"
-    />
+    <ConfirmDialog :open="deleteOpen" title="删除笔友" message="删除后将移除这段笔友关系" confirm-text="删除" danger @confirm="onDelete"
+      @cancel="deleteOpen = false" />
   </div>
 </template>
 
@@ -174,10 +167,12 @@ async function onDelete(): Promise<void> {
   max-width: 560px;
   margin: 0 auto;
 }
+
 .profile-page__head {
   display: flex;
   align-items: center;
 }
+
 .profile-page__back {
   display: inline-flex;
   align-items: center;
@@ -191,16 +186,19 @@ async function onDelete(): Promise<void> {
   cursor: pointer;
   transition: color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
 }
+
 .profile-page__back:hover {
   color: var(--accent-primary);
   background: var(--bg-secondary);
 }
+
 .profile-page__loading {
   padding: var(--space-8) 0;
   font-size: 13px;
   color: var(--text-muted);
   text-align: center;
 }
+
 .profile-hero {
   display: flex;
   flex-direction: column;
@@ -213,6 +211,7 @@ async function onDelete(): Promise<void> {
   box-shadow: var(--shadow-card);
   text-align: center;
 }
+
 .profile-hero__name {
   margin: var(--space-2) 0 0;
   font-family: var(--font-display);
@@ -220,15 +219,18 @@ async function onDelete(): Promise<void> {
   font-weight: 600;
   color: var(--text-primary);
 }
+
 .profile-hero__origin {
   margin-top: 2px;
   font-size: 12px;
   color: var(--text-secondary);
 }
+
 .profile-hero__username {
   font-size: 13px;
   color: var(--text-muted);
 }
+
 .profile-hero__bio {
   margin: var(--space-1) 0 0;
   font-size: 13px;
@@ -237,6 +239,7 @@ async function onDelete(): Promise<void> {
   white-space: pre-wrap;
   word-break: break-word;
 }
+
 .profile-form {
   display: flex;
   flex-direction: column;
@@ -247,6 +250,7 @@ async function onDelete(): Promise<void> {
   background: var(--bg-card);
   box-shadow: var(--shadow-card);
 }
+
 .profile-form__field {
   display: flex;
   flex-direction: column;
@@ -254,6 +258,7 @@ async function onDelete(): Promise<void> {
   font-size: 13px;
   color: var(--text-secondary);
 }
+
 .profile-form__control {
   width: 100%;
   padding: 10px 14px;
@@ -265,19 +270,23 @@ async function onDelete(): Promise<void> {
   border-radius: var(--radius-md);
   transition: border-color var(--duration-fast) var(--ease-standard);
 }
+
 .profile-form__control:focus {
   outline: none;
   border-color: var(--accent-primary);
 }
+
 .profile-form__actions {
   display: flex;
   justify-content: flex-end;
 }
+
 .profile-ops {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
 }
+
 @media (max-width: 640px) {
   .profile-form {
     padding: var(--space-4);
