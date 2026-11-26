@@ -23,8 +23,19 @@ const { conversations, messagesByConv, messagesLoading, sending, error } = store
 const activeId = ref<number | null>(null)
 const draft = ref('')
 const messageListEl = ref<HTMLElement | null>(null)
+const inputEl = ref<HTMLTextAreaElement | null>(null)
 let pollTimer: number | undefined
 const MSG_POLL_MS = 4000
+
+// 输入框高度自适应：默认与发送按钮等高，内容换行时增高（上限由 CSS 控制）
+function autoResize(): void {
+  const el = inputEl.value
+  if (!el) return
+  el.style.height = 'auto'
+  el.style.height = `${el.scrollHeight}px`
+}
+
+watch(draft, () => void nextTick(autoResize))
 
 const activeConv = computed(() => conversations.value.find((c) => c.id === activeId.value) ?? null)
 const messages = computed(() => (activeId.value === null ? [] : messagesByConv.value[activeId.value] ?? []))
@@ -133,17 +144,20 @@ async function submit(): Promise<void> {
       <header class="chat-window__head">
         <button
           type="button"
-          class="chat-window__friends"
+          class="chat-window__back"
+          title="返回笔友"
+          aria-label="返回笔友"
           @click="router.push('/friends')"
         >
-          <AppIcon name="chevron-left" :size="16" />
-          <span>返回笔友</span>
+          <AppIcon name="chevron-left" :size="18" />
         </button>
-        <UserAvatar :name="activeConv.peer.displayName" :url="activeConv.peer.avatarUrl" :size="34" />
-        <div class="chat-window__peer">
-          <span class="chat-window__name">{{ activeConv.peer.displayName }}</span>
-          <span class="chat-window__handle">@{{ activeConv.peer.username }}</span>
-        </div>
+        <UserAvatar
+          class="chat-window__peer-avatar"
+          :name="activeConv.peer.displayName"
+          :url="activeConv.peer.avatarUrl"
+          :size="34"
+          :title="activeConv.peer.displayName"
+        />
       </header>
 
       <div ref="messageListEl" class="chat-window__messages">
@@ -175,11 +189,13 @@ async function submit(): Promise<void> {
 
       <div class="chat-window__composer">
         <textarea
+          ref="inputEl"
           v-model="draft"
           class="chat-window__input"
-          rows="2"
+          rows="1"
           placeholder="发送消息"
           :disabled="sending"
+          @input="autoResize"
           @keydown.enter.exact.prevent="submit"
         />
         <BaseButton
@@ -214,44 +230,27 @@ async function submit(): Promise<void> {
 .chat-window__head {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  justify-content: space-between; /* 返回图标靠左，对方头像靠右 */
   padding: var(--space-3) var(--space-5);
   border-bottom: 1px solid var(--border-default);
   background: var(--bg-card);
 }
-.chat-window__friends {
+.chat-window__back {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 5px 9px;
-  margin-right: var(--space-1);
-  border: 1px solid var(--border-default);
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
   border-radius: var(--radius-md);
   background: transparent;
   color: var(--text-secondary);
-  font-size: 12px;
-  white-space: nowrap;
   cursor: pointer;
-  transition: color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+  transition: color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
 }
-.chat-window__friends:hover {
+.chat-window__back:hover {
   color: var(--accent-primary);
-  border-color: var(--accent-primary);
-}
-.chat-window__peer {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.chat-window__name {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-.chat-window__handle {
-  font-size: 11px;
-  color: var(--text-muted);
+  background: var(--bg-secondary);
 }
 .chat-window__messages {
   flex: 1;
@@ -367,14 +366,19 @@ async function submit(): Promise<void> {
 .chat-window__input {
   flex: 1;
   min-width: 0;
-  padding: 8px 12px;
-  font-size: 14px;
+  min-height: 32px; /* 默认与发送按钮等高 */
+  max-height: 168px; /* 自动增高/手动拉伸上限 */
+  padding: 6px 12px;
+  font-size: 13px;
   font-family: var(--font-body);
+  line-height: 20px;
   color: var(--text-primary);
   background: var(--bg-secondary);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
-  resize: none;
+  resize: vertical; /* 用户可手动拉高，宽度随 flex 自适应 */
+  overflow-y: auto; /* 内容超出上限时滚动查看 */
+  box-sizing: border-box;
 }
 .chat-window__input::placeholder {
   color: var(--text-muted);

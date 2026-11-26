@@ -65,13 +65,27 @@ function showNotificationToast(n: Notification, toast: ReturnType<typeof useToas
       })
       break
     case 'comment':
-      toast.systemMessage(content || `${name} 评论了你的笔记`)
+      toast.notifyMessage({
+        avatar: n.actorAvatar,
+        name,
+        label: '评论了你的笔记',
+        // 去掉服务端 content 里重复的动作前缀，只留评论正文
+        content: content.replace(/^评论了你的笔记[:：]?\s*/, '') || '评论了你的笔记',
+        link: n.relatedId !== null ? `/notes/${n.relatedId}/edit` : undefined,
+      })
       break
     case 'like':
-      toast.systemMessage(content || `${name} 赞了你的笔记`)
+      toast.notifyMessage({
+        avatar: n.actorAvatar,
+        name,
+        label: '赞了你的笔记',
+        content: content.replace(/^赞了你的笔记[:：]?\s*/, '') || '赞了你的笔记',
+        link: n.relatedId !== null ? `/notes/${n.relatedId}/edit` : undefined,
+      })
       break
     default:
-      toast.systemMessage(content || '你有一条新通知')
+      // 系统消息（无触发者）：与笔友通知同形态，用「系统」标识
+      toast.notifyMessage({ name: '系统', label: '系统通知', content: content || '你有一条新通知' })
   }
 }
 

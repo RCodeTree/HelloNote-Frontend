@@ -32,7 +32,7 @@ function onToastClick(toast: ToastItem): void {
             <div class="toast__action">
               <div class="toast__action-top">
                 <span class="toast__action-name">{{ t.name || '新消息' }}</span>
-                <span class="toast__action-label">发来消息</span>
+                <span class="toast__action-label">{{ t.label || '发来消息' }}</span>
               </div>
               <div class="toast__action-content">{{ t.content }}</div>
             </div>

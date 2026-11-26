@@ -3,6 +3,8 @@ import { reactive } from 'vue'
 export interface FriendMessagePayload {
   avatar?: string | null
   name?: string
+  /** 动作描述，如「发来消息」「评论了你的笔记」；缺省「发来消息」 */
+  label?: string
   content: string
   link?: string
 }
@@ -11,10 +13,11 @@ export interface ToastItem {
   id: number
   message: string
   type: 'success' | 'error' | 'info'
-  /** 富内容形态：action=好友消息，system=系统通知；缺省为普通提示 */
+  /** 富内容形态：action=带头像昵称的消息（好友/系统通知），system=纯系统提示；缺省为普通提示 */
   kind?: 'action' | 'system'
   avatar?: string | null
   name?: string
+  label?: string
   content?: string
   link?: string
 }
@@ -46,9 +49,12 @@ export function useToast() {
     error: (message: string) => push({ message, type: 'error' }),
     info: (message: string) => push({ message, type: 'info' }),
     /** 好友消息推送：头像 + 昵称 + 内容，点击可跳转会话 */
-    friendMessage: ({ avatar = null, name = '', content, link }: FriendMessagePayload) =>
-      push({ message: content, type: 'info', kind: 'action', avatar, name, content, link }),
-    /** 系统通知推送 */
+    friendMessage: ({ avatar = null, name = '', label = '发来消息', content, link }: FriendMessagePayload) =>
+      push({ message: content, type: 'info', kind: 'action', avatar, name, label, content, link }),
+    /** 系统通知富消息推送：与好友消息同形态（头像 + 昵称 + 动作 + 内容） */
+    notifyMessage: ({ avatar = null, name = '', label = '通知', content, link }: FriendMessagePayload) =>
+      push({ message: content, type: 'info', kind: 'action', avatar, name, label, content, link }),
+    /** 纯系统提示（无触发者）：铃铛标识 + 内容 */
     systemMessage: (content: string) => push({ message: content, type: 'info', kind: 'system', content }),
   }
 }

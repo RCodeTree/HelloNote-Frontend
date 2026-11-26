@@ -1,21 +1,27 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import AppIcon, { type IconName } from '@/components/common/AppIcon.vue'
 import BaseButton from '@/components/common/BaseButton.vue'
+import UserAvatar from '@/components/common/UserAvatar.vue'
 import EmptyState from '@/components/feedback/EmptyState.vue'
 import { useNotificationsStore } from '@/modules/notifications/stores/notifications.store'
 import { useFriendsStore } from '@/modules/friends/stores/friends.store'
 import type { Notification, NotificationType } from '@/modules/notifications/types/notifications.types'
 
+const route = useRoute()
 const router = useRouter()
 const store = useNotificationsStore()
 const friendsStore = useFriendsStore()
 const { notifications, unreadCount, loading } = storeToRefs(store)
 const acceptingId = ref<number | null>(null)
 
+// 铃铛仅首页显示
+const isHome = computed(() => route.name === 'home')
+
 const open = ref(false)
+const detail = ref<Notification | null>(null)
 const rootEl = ref<HTMLElement | null>(null)
 
 const icon: Record<NotificationType, IconName> = {
@@ -46,7 +52,15 @@ function toggle(): void {
   if (open.value) void store.load()
 }
 
-function targetOf(n: Notification): string | null {
+function openDetail(n: Notification): void {
+  if (!n.isRead) void store.markRead(n.id)
+  open.value = false
+  detail.value = n
+}
+
+function detailTarget(): string | null {
+  const n = detail.value
+  if (!n) return null
   if (n.type === 'friend_request' || n.type === 'friend_accept') return '/friends'
   if (n.relatedId !== null && (n.type === 'comment' || n.type === 'like')) {
     return `/notes/${n.relatedId}/edit`
@@ -54,13 +68,11 @@ function targetOf(n: Notification): string | null {
   return null
 }
 
-function onNotifyClick(n: Notification): void {
-  if (!n.isRead) void store.markRead(n.id)
-  const target = targetOf(n)
-  if (target) {
-    open.value = false
-    void router.push(target)
-  }
+function goDetailTarget(): void {
+  const target = detailTarget()
+  if (!target) return
+  detail.value = null
+  void router.push(target)
 }
 
 async function acceptRequest(n: Notification): Promise<void> {
@@ -71,6 +83,7 @@ async function acceptRequest(n: Notification): Promise<void> {
   if (!ok) return
   await store.markRead(n.id)
   void store.load()
+  if (detail.value?.id === n.id) detail.value = null
 }
 
 async function ignoreRequest(n: Notification): Promise<void> {
@@ -79,13 +92,16 @@ async function ignoreRequest(n: Notification): Promise<void> {
   if (!ok) return
   await store.markRead(n.id)
   void store.load()
+  if (detail.value?.id === n.id) detail.value = null
 }
 
 function onDocClick(e: MouseEvent): void {
   if (rootEl.value && !rootEl.value.contains(e.target as Node)) open.value = false
 }
 function onKeydown(e: KeyboardEvent): void {
-  if (e.key === 'Escape') open.value = false
+  if (e.key !== 'Escape') return
+  if (detail.value) detail.value = null
+  else open.value = false
 }
 onMounted(() => {
   document.addEventListener('click', onDocClick)
@@ -99,7 +115,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="rootEl" class="topbar-actions">
+  <div v-if="isHome" ref="rootEl" class="topbar-actions">
     <button
       type="button"
       class="notify-bell"
@@ -129,7 +145,7 @@ onBeforeUnmount(() => {
               :key="n.id"
               class="notify-item"
               :class="{ 'is-unread': !n.isRead }"
-              @click="onNotifyClick(n)"
+              @click="openDetail(n)"
             >
               <span class="notify-item__icon" :class="`notify-item__icon--${n.type}`">
                 <AppIcon :name="icon[n.type]" :size="15" />
@@ -158,6 +174,51 @@ onBeforeUnmount(() => {
       </div>
     </Transition>
   </div>
+
+  <!-- 通知详情模态框 -->
+  <Teleport to="body">
+    <Transition name="modal">
+      <div v-if="detail" class="detail-modal" @click.self="detail = null">
+        <section class="detail-modal__card" role="dialog" aria-modal="true" aria-label="通知详情">
+          <header class="detail-modal__head">
+            <span class="detail-modal__icon" :class="`detail-modal__icon--${detail.type}`">
+              <AppIcon :name="icon[detail.type]" :size="18" />
+            </span>
+            <div class="detail-modal__heading">
+              <h2>{{ label[detail.type] }}</h2>
+              <time>{{ formatTime(detail.createdAt) }}</time>
+            </div>
+            <button type="button" class="detail-modal__close" aria-label="关闭" @click="detail = null">
+              <AppIcon name="close" :size="17" />
+            </button>
+          </header>
+          <div class="detail-modal__body">
+            <div v-if="detail.actorName" class="detail-modal__actor">
+              <UserAvatar :name="detail.actorName" :url="detail.actorAvatar" :size="30" />
+              <span>{{ detail.actorName }}</span>
+            </div>
+            <p class="detail-modal__content">{{ detail.content }}</p>
+          </div>
+          <footer class="detail-modal__foot">
+            <div v-if="detail.type === 'friend_request' && detail.relatedId !== null" class="detail-modal__ops">
+              <BaseButton
+                variant="primary"
+                size="sm"
+                :loading="acceptingId === detail.id"
+                @click="acceptRequest(detail)"
+              >
+                接受
+              </BaseButton>
+              <BaseButton variant="ghost" size="sm" @click="ignoreRequest(detail)">忽略</BaseButton>
+            </div>
+            <BaseButton v-if="detailTarget()" variant="ghost" size="sm" @click="goDetailTarget">
+              查看详情
+            </BaseButton>
+          </footer>
+        </section>
+      </div>
+    </Transition>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -316,5 +377,152 @@ onBeforeUnmount(() => {
   display: flex;
   gap: var(--space-2);
   margin-top: var(--space-2);
+}
+
+/* 通知详情模态框 */
+.detail-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+.detail-modal__card {
+  width: min(480px, 100%);
+  max-height: min(72dvh, 620px);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-floating);
+  overflow: hidden;
+}
+.detail-modal__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--border-default);
+}
+.detail-modal__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+}
+.detail-modal__icon--friend_request,
+.detail-modal__icon--friend_accept {
+  background: color-mix(in srgb, var(--accent-primary) 14%, transparent);
+  color: var(--accent-primary);
+}
+.detail-modal__icon--like {
+  background: color-mix(in srgb, var(--accent-danger) 14%, transparent);
+  color: var(--accent-danger);
+}
+.detail-modal__heading {
+  flex: 1;
+  min-width: 0;
+}
+.detail-modal__heading h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.detail-modal__heading time {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.detail-modal__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.detail-modal__close:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+.detail-modal__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-4);
+}
+.detail-modal__actor {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.detail-modal__content {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.detail-modal__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border-default);
+}
+.detail-modal__foot:empty {
+  display: none;
+}
+.detail-modal__ops {
+  display: flex;
+  gap: var(--space-2);
+  margin-right: auto;
+}
+/* 模态框进出过渡 */
+.modal-enter-active,
+.modal-leave-active {
+  transition: opacity 200ms var(--ease-standard);
+}
+.modal-enter-active .detail-modal__card,
+.modal-leave-active .detail-modal__card {
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
+}
+.modal-enter-from .detail-modal__card,
+.modal-leave-to .detail-modal__card {
+  transform: translateY(12px) scale(0.97);
+}
+@media (prefers-reduced-motion: reduce) {
+  .modal-enter-active,
+  .modal-leave-active,
+  .modal-enter-active .detail-modal__card,
+  .modal-leave-active .detail-modal__card {
+    transition: none;
+  }
 }
 </style>
