@@ -26,7 +26,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { to: '/', label: '首页', icon: 'home', active: (p) => p === '/' },
   { to: '/dashboard', label: '面板', icon: 'grid', active: (p) => p === '/dashboard' },
-  { to: '/notes', label: '笔记', icon: 'note', active: (p) => p.startsWith('/notes') && p !== '/notes/square' },
+  { to: '/notes', label: '笔记', icon: 'book-open', active: (p) => p.startsWith('/notes') && p !== '/notes/square' },
   { to: '/notes/square', label: '广场', icon: 'sparkles', active: (p) => p === '/notes/square' },
   { to: '/friends', label: '笔友', icon: 'users', active: (p) => p.startsWith('/friends') },
 ]

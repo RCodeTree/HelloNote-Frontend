@@ -179,11 +179,12 @@ const activitySummary = computed(() => activity.value?.summary ?? null)
 }
 
 /* 桌面宽屏：左/中列保持自然高度（不拉伸，避免格子/卡片畸形）。
-   仅右列「最近笔记」这一张列表卡填满行高——多出的空间由更多笔记内容 +
-   独立滚动占据，不产生空洞；行高仍由左/中列决定，右列不会反向撑高页面。 */
+   仅右列「最近笔记」这一张列表卡填满行高——但行高可能超过视口（日历列很高），
+   因此给右列加视口高度上限：卡片始终完整可见，列表在卡片内部滚动查看。 */
 @media (min-width: 1181px) {
   .db-col--right {
     align-self: stretch;
+    max-height: calc(100dvh - 140px); /* 减去页面头部与间距，卡片不出视口 */
   }
   .db-right-notes {
     flex: 1 1 auto;
@@ -192,7 +193,13 @@ const activitySummary = computed(() => activity.value?.summary ?? null)
   .db-right-notes :deep(.panel__list.is-scroll) {
     flex: 1 1 auto;
     min-height: 0;
-    max-height: none;
+    max-height: none; /* 高度由 flex 收缩决定，随卡片一起不超出视口 */
+  }
+}
+/* 视口较矮时给列表兜底最小可读高度，避免被压得过扁 */
+@media (min-width: 1181px) and (max-height: 720px) {
+  .db-col--right {
+    max-height: 480px;
   }
 }
 
