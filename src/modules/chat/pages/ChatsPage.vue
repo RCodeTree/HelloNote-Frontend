@@ -140,8 +140,10 @@ async function submit(): Promise<void> {
   if (sent === null) {
     draft.value = text
     toast.error(error.value || '发送失败')
+    void nextTick(focusInput)
     return
   }
+  void nextTick(focusInput)
   void notifications.refreshCount()
 }
 </script>
