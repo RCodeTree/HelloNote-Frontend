@@ -1,8 +1,11 @@
 import { onMounted, onUnmounted } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useToast } from '@/composables/useToast'
 import { useAuthStore } from '@/modules/auth'
 import { useNotificationsStore } from '@/modules/notifications'
 import { useChatStore } from '@/modules/chat/stores/chat.store'
+import { useFriendsStore } from '@/modules/friends/stores/friends.store'
+import type { Friend } from '@/modules/friends/types/friends.types'
 import * as notificationsApi from '@/modules/notifications/api/notifications.api'
 import { fetchConversations } from '@/modules/chat/api/chat.api'
 import type { Conversation } from '@/modules/chat/types/chat.types'
@@ -44,8 +47,19 @@ function contentWithoutActor(n: Notification): string {
   return n.content
 }
 
-function showNotificationToast(n: Notification, toast: ReturnType<typeof useToast>): void {
-  const name = n.actorName || '有人'
+/** 展示名优先取笔友备注（按 userId 匹配），无则回退原昵称 */
+function resolveName(userId: number | null, fallback: string, friends: Friend[]): string {
+  if (userId === null) return fallback
+  const f = friends.find((item) => item.userId === userId)
+  return f?.note || fallback
+}
+
+function showNotificationToast(
+  n: Notification,
+  toast: ReturnType<typeof useToast>,
+  friends: Friend[],
+): void {
+  const name = resolveName(n.actorId, n.actorName || '有人', friends)
   const content = contentWithoutActor(n)
   switch (n.type) {
     case 'friend_request':
@@ -98,7 +112,9 @@ export function useNotifications(): void {
   const auth = useAuthStore()
   const notificationStore = useNotificationsStore()
   const chatStore = useChatStore()
+  const friendsStore = useFriendsStore()
   const toast = useToast()
+  const { friends } = storeToRefs(friendsStore)
 
   async function poll(): Promise<void> {
     const token = localStorage.getItem(TOKEN_KEY)
@@ -112,6 +128,8 @@ export function useNotifications(): void {
     }
 
     try {
+      // 好友备注用于 toast 展示名；首次加载一次即可（store 会缓存）
+      if (!friends.value.length) void friendsStore.loadFriends()
       const [list, count, conversations] = await Promise.all([
         notificationsApi.fetchNotifications(),
         notificationsApi.fetchUnreadCount(),
@@ -127,7 +145,7 @@ export function useNotifications(): void {
       }
 
       const fresh = list.filter((n) => n.id > lastSeenNotificationId)
-      for (const n of fresh) showNotificationToast(n, toast)
+      for (const n of fresh) showNotificationToast(n, toast, friends.value)
 
       let nextBaseline = convBaseline
       for (const c of conversations) {
@@ -138,7 +156,7 @@ export function useNotifications(): void {
         if (hasNew && chatStore.activeConversationId !== c.id) {
           toast.friendMessage({
             avatar: c.peer.avatarUrl,
-            name: c.peer.displayName,
+            name: resolveName(c.peer.id, c.peer.displayName, friends.value),
             content: c.lastMessage ?? '',
             link: `/chats/${c.peer.id}`,
           })

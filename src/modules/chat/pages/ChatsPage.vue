@@ -195,7 +195,6 @@ async function submit(): Promise<void> {
 
       <div ref="messageListEl" class="chat-window__messages">
         <div v-if="messagesLoading" class="chat-window__loading">加载中…</div>
-        <EmptyState v-else-if="!messages.length" title="暂无消息" />
         <TransitionGroup :key="activeId ?? 0" name="msg" tag="div" class="msg-list">
           <div v-for="msg in messageRows" :key="msg.id" class="msg-item">
             <div v-if="msg.showTime" class="msg__time">{{ msg.timeLabel }}</div>
