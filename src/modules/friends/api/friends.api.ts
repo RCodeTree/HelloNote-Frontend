@@ -22,6 +22,7 @@ interface RawFriend {
   relation_type?: string | null
   closeness?: string | null
   unread_count?: number
+  is_pinned?: boolean | null
 }
 
 interface RawFriendSettings {
@@ -29,6 +30,7 @@ interface RawFriendSettings {
   privacy?: FriendPrivacy
   relation_type?: string
   closeness?: FriendCloseness
+  is_pinned?: boolean
 }
 
 interface RawFriendBrief {
@@ -61,6 +63,7 @@ function mapFriend(r: RawFriend): Friend {
     relationType: r.relation_type ?? '',
     closeness: toCloseness(r.closeness),
     unreadCount: r.unread_count ?? 0,
+    isPinned: !!r.is_pinned,
   }
 }
 
@@ -103,6 +106,7 @@ export async function updateFriendSettings(friendshipId: number, payload: Friend
   if (payload.privacy !== undefined) body.privacy = payload.privacy
   if (payload.relationType !== undefined) body.relation_type = payload.relationType
   if (payload.closeness !== undefined) body.closeness = payload.closeness
+  if (payload.isPinned !== undefined) body.is_pinned = payload.isPinned
   const { data } = await http.patch<RawFriend>(`/friends/${friendshipId}/settings`, body)
   return mapFriend(data)
 }

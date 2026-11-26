@@ -46,6 +46,12 @@ export const routes: RouteRecordRaw[] = [
     meta: { title: '笔友', layout: 'default', requiresAuth: true },
   },
   {
+    path: '/friends/:userId/profile',
+    name: 'friend-profile',
+    component: () => import('@/modules/friends/pages/FriendProfilePage.vue'),
+    meta: { title: '笔友资料', layout: 'default', requiresAuth: true },
+  },
+  {
     path: '/chats',
     redirect: '/friends',
     meta: { title: '消息' },

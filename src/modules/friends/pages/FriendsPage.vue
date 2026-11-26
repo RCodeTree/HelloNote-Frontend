@@ -5,7 +5,6 @@ import { storeToRefs } from 'pinia'
 import AppIcon from '@/components/common/AppIcon.vue'
 import BaseButton from '@/components/common/BaseButton.vue'
 import BaseInput from '@/components/common/BaseInput.vue'
-import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import UserAvatar from '@/components/common/UserAvatar.vue'
 import EmptyState from '@/components/feedback/EmptyState.vue'
 import { useToast } from '@/composables/useToast'
@@ -28,16 +27,6 @@ const results = ref<FriendBrief[]>([])
 const searching = ref(false)
 const searched = ref(false)
 const adding = ref(false)
-const settingsTarget = ref<Friend | null>(null)
-const settingsOpen = computed(() => settingsTarget.value !== null)
-const settingsSaving = ref(false)
-const formNote = ref('')
-const formPrivacy = ref<FriendPrivacy>('all')
-const formRelationType = ref('')
-const formCloseness = ref<FriendCloseness>('acquaintance')
-
-const deleteTarget = ref<Friend | null>(null)
-const deleteOpen = computed(() => deleteTarget.value !== null)
 
 const privacyLabel: Record<FriendPrivacy, string> = {
   all: '公开',
@@ -51,17 +40,46 @@ const closenessLabel: Record<FriendCloseness, string> = {
   intimate: '至交',
 }
 
-let timer: ReturnType<typeof setTimeout> | null = null
+// 置顶 > 未读 > 其余；同档保持接口返回顺序
+const sortedFriends = computed(() => {
+  const rank = (f: Friend) => (f.isPinned ? 2 : f.unreadCount > 0 ? 1 : 0)
+  return [...friends.value].sort((a, b) => rank(b) - rank(a))
+})
+
+// 右键 / 长按上下文菜单
+const menuOpen = ref(false)
+const menuFriend = ref<Friend | null>(null)
+const menuPos = ref({ x: 0, y: 0 })
+const menuEl = ref<HTMLElement | null>(null)
+const MENU_WIDTH = 160
+const MENU_HEIGHT = 96
+
+let searchTimer: ReturnType<typeof setTimeout> | null = null
+let longPressTimer: ReturnType<typeof setTimeout> | null = null
+let longPressFired = false
+let pressStart = { x: 0, y: 0 }
+let friendsPollTimer: number | undefined
+const FRIEND_POLL_MS = 8000
 
 onMounted(() => {
   void store.init()
+  // 好友未读来自 /friends，定期刷新让新消息驱动的排序自动生效
+  friendsPollTimer = window.setInterval(() => {
+    if (friends.value.length) void store.loadFriends()
+  }, FRIEND_POLL_MS)
+  document.addEventListener('pointerdown', onDocPointerDown)
+  document.addEventListener('keydown', onDocKeydown)
 })
 onBeforeUnmount(() => {
-  if (timer) clearTimeout(timer)
+  if (searchTimer) clearTimeout(searchTimer)
+  if (longPressTimer) clearTimeout(longPressTimer)
+  if (friendsPollTimer !== undefined) window.clearInterval(friendsPollTimer)
+  document.removeEventListener('pointerdown', onDocPointerDown)
+  document.removeEventListener('keydown', onDocKeydown)
 })
 
 watch(keyword, (val) => {
-  if (timer) clearTimeout(timer)
+  if (searchTimer) clearTimeout(searchTimer)
   searched.value = val.trim().length > 0
   if (!searched.value) {
     results.value = []
@@ -69,7 +87,7 @@ watch(keyword, (val) => {
     return
   }
   searching.value = true
-  timer = setTimeout(async () => {
+  searchTimer = setTimeout(async () => {
     results.value = await store.search(val)
     searching.value = false
   }, 300)
@@ -90,6 +108,14 @@ function toggleAdd(): void {
 
 function openChat(userId: number): void {
   void router.push(`/chats/${userId}`)
+}
+
+function openProfile(friend: Friend): void {
+  if (longPressFired) {
+    longPressFired = false
+    return
+  }
+  void router.push(`/friends/${friend.userId}/profile`)
 }
 
 async function addByName(): Promise<void> {
@@ -115,46 +141,95 @@ async function addFromResult(brief: FriendBrief): Promise<void> {
   else toast.error(error.value || '添加失败')
 }
 
-function openSettings(friend: Friend): void {
-  settingsTarget.value = friend
-  formNote.value = friend.note
-  formPrivacy.value = friend.privacy
-  formRelationType.value = friend.relationType
-  formCloseness.value = friend.closeness
+function clampPos(x: number, y: number): { x: number; y: number } {
+  const pad = 8
+  return {
+    x: Math.max(pad, Math.min(x, window.innerWidth - MENU_WIDTH - pad)),
+    y: Math.max(pad, Math.min(y, window.innerHeight - MENU_HEIGHT - pad)),
+  }
 }
 
-async function saveSettings(): Promise<void> {
-  const target = settingsTarget.value
-  if (!target || settingsSaving.value) return
-  settingsSaving.value = true
-  const ok = await store.updateSettings(target.id, {
-    note: formNote.value.trim(),
-    privacy: formPrivacy.value,
-    relationType: formRelationType.value.trim(),
-    closeness: formCloseness.value,
-  })
-  settingsSaving.value = false
-  if (!ok) {
-    toast.error(error.value || '保存失败')
+function openMenu(friend: Friend, x: number, y: number): void {
+  menuFriend.value = friend
+  menuPos.value = clampPos(x, y)
+  menuOpen.value = true
+}
+
+function closeMenu(): void {
+  menuOpen.value = false
+  menuFriend.value = null
+}
+
+function onContextMenu(event: MouseEvent, friend: Friend): void {
+  openMenu(friend, event.clientX, event.clientY)
+}
+
+function onDocPointerDown(event: PointerEvent): void {
+  if (!menuOpen.value) return
+  if (menuEl.value?.contains(event.target as Node)) return
+  closeMenu()
+}
+
+function onDocKeydown(event: KeyboardEvent): void {
+  if (event.key === 'Escape' && menuOpen.value) closeMenu()
+}
+
+function onTouchStart(event: TouchEvent, friend: Friend): void {
+  const touch = event.touches[0]
+  if (!touch) return
+  pressStart = { x: touch.clientX, y: touch.clientY }
+  longPressFired = false
+  if (longPressTimer) clearTimeout(longPressTimer)
+  longPressTimer = setTimeout(() => {
+    longPressFired = true
+    openMenu(friend, touch.clientX, touch.clientY)
+  }, 500)
+}
+
+function onTouchMove(event: TouchEvent): void {
+  const touch = event.touches[0]
+  if (!touch) return
+  if (
+    Math.abs(touch.clientX - pressStart.x) > 10 ||
+    Math.abs(touch.clientY - pressStart.y) > 10
+  ) {
+    if (longPressTimer) clearTimeout(longPressTimer)
+  }
+}
+
+function onTouchEnd(): void {
+  if (longPressTimer) clearTimeout(longPressTimer)
+  // 有些浏览器长按后不派发 click，短暂保留标记后重置，避免影响下一次点击
+  window.setTimeout(() => {
+    longPressFired = false
+  }, 350)
+}
+
+function onItemClick(friend: Friend): void {
+  if (longPressFired) {
+    longPressFired = false
     return
   }
-  settingsTarget.value = null
-  toast.success('已保存')
+  openChat(friend.userId)
 }
 
-function requestDeleteFromSettings(): void {
-  if (!settingsTarget.value) return
-  deleteTarget.value = settingsTarget.value
-  settingsTarget.value = null
+async function menuMarkRead(): Promise<void> {
+  const friend = menuFriend.value
+  closeMenu()
+  if (!friend) return
+  const ok = await store.markRead(friend.userId)
+  if (ok) toast.success('已标记已读')
+  else toast.error(error.value || '操作失败')
 }
 
-async function onDelete(): Promise<void> {
-  const target = deleteTarget.value
-  if (!target) return
-  deleteTarget.value = null
-  const ok = await store.remove(target.id)
-  if (ok) toast.success('已删除')
-  else toast.error(error.value || '删除失败')
+async function menuTogglePin(): Promise<void> {
+  const friend = menuFriend.value
+  if (!friend) return
+  const wasPinned = friend.isPinned
+  closeMenu()
+  const ok = await store.updateSettings(friend.id, { isPinned: !wasPinned })
+  if (ok) toast.success(wasPinned ? '已取消置顶' : '已置顶')
+  else toast.error(error.value || '操作失败')
 }
 </script>
 
@@ -199,99 +274,74 @@ async function onDelete(): Promise<void> {
       </div>
     </section>
 
-    <!-- 笔友列表：每个 item 是独立卡片 -->
+    <!-- 笔友列表：每个 item 是独立卡片，置顶/未读变化时平滑重排 -->
     <div class="friend-list-panel">
       <template v-if="loading && !friends.length">
         <div class="friend-list-loading">加载中…</div>
       </template>
       <template v-else-if="friends.length">
-        <div
-          v-for="friend in friends"
-          :key="friend.id"
-          class="list-item list-item--friend"
-          @click="openChat(friend.userId)"
-        >
-          <span class="list-item__avatar">
-            <UserAvatar :name="friend.displayName" :url="friend.avatarUrl" :size="42" />
-            <span v-if="friend.unreadCount > 0" class="list-item__dot">{{ friend.unreadCount }}</span>
-          </span>
-          <span class="list-item__body">
-            <span class="list-item__line">
-              <span class="list-item__name">{{ displayName(friend) }}</span>
-              <span class="friend-tag">{{ friend.relationType || '笔友' }}</span>
-              <span class="friend-tag friend-tag--soft">{{ closenessLabel[friend.closeness] }}</span>
-              <span v-if="friend.privacy !== 'all'" class="friend-tag friend-tag--soft">
-                {{ privacyLabel[friend.privacy] }}
-              </span>
-            </span>
-            <span class="list-item__sub">@{{ friend.username }}</span>
-          </span>
-          <button
-            type="button"
-            class="friend-row__setting"
-            aria-label="好友设置"
-            @click.stop="openSettings(friend)"
+        <TransitionGroup name="friend" tag="div" class="friend-list">
+          <div
+            v-for="friend in sortedFriends"
+            :key="friend.id"
+            class="list-item list-item--friend"
+            @click="onItemClick(friend)"
+            @contextmenu.prevent="onContextMenu($event, friend)"
+            @touchstart="onTouchStart($event, friend)"
+            @touchmove="onTouchMove"
+            @touchend="onTouchEnd"
           >
-            <AppIcon name="settings" :size="16" />
-          </button>
-        </div>
+            <span class="list-item__avatar" title="查看笔友资料" @click.stop="openProfile(friend)">
+              <UserAvatar :name="friend.displayName" :url="friend.avatarUrl" :size="42" />
+              <span v-if="friend.unreadCount > 0" class="list-item__dot">{{ friend.unreadCount }}</span>
+            </span>
+            <span class="list-item__body">
+              <span class="list-item__line">
+                <AppIcon v-if="friend.isPinned" name="pin" :size="13" class="friend-pin" />
+                <span class="list-item__name">{{ displayName(friend) }}</span>
+                <span class="friend-tag">{{ friend.relationType || '笔友' }}</span>
+                <span class="friend-tag friend-tag--soft">{{ closenessLabel[friend.closeness] }}</span>
+                <span v-if="friend.privacy !== 'all'" class="friend-tag friend-tag--soft">
+                  {{ privacyLabel[friend.privacy] }}
+                </span>
+              </span>
+              <span class="list-item__sub">@{{ friend.username }}</span>
+            </span>
+            <button
+              type="button"
+              class="friend-row__profile"
+              aria-label="查看笔友资料"
+              @click.stop="openProfile(friend)"
+            >
+              <AppIcon name="user" :size="16" />
+            </button>
+          </div>
+        </TransitionGroup>
       </template>
       <EmptyState v-else title="暂无笔友" />
     </div>
 
-    <!-- 好友设置 -->
+    <!-- 右键 / 长按菜单 -->
     <Teleport to="body">
-      <div v-if="settingsOpen" class="settings">
-        <div class="settings__scrim" @click="settingsTarget = null" />
-        <div class="settings__card" role="dialog" aria-modal="true">
-          <div class="settings__head">
-            <h2 class="settings__title">好友设置</h2>
-            <button type="button" class="settings__close" aria-label="关闭" @click="settingsTarget = null">
-              <AppIcon name="close" :size="16" />
-            </button>
-          </div>
-          <div class="settings__body">
-            <BaseInput v-model="formNote" label="备注" placeholder="备注" />
-            <label class="settings__field">
-              <span>关系类别</span>
-              <input v-model="formRelationType" class="settings__control" placeholder="如：笔友" />
-            </label>
-            <label class="settings__field">
-              <span>隐私</span>
-              <select v-model="formPrivacy" class="settings__control">
-                <option value="all">公开</option>
-                <option value="friends">仅好友</option>
-                <option value="hidden">隐藏</option>
-              </select>
-            </label>
-            <label class="settings__field">
-              <span>亲密程度</span>
-              <select v-model="formCloseness" class="settings__control">
-                <option value="acquaintance">认识</option>
-                <option value="friend">好友</option>
-                <option value="close">亲密</option>
-                <option value="intimate">至交</option>
-              </select>
-            </label>
-            <button type="button" class="settings__delete" @click="requestDeleteFromSettings">删除笔友</button>
-          </div>
-          <div class="settings__actions">
-            <BaseButton variant="ghost" size="sm" @click="settingsTarget = null">取消</BaseButton>
-            <BaseButton variant="primary" size="sm" :loading="settingsSaving" @click="saveSettings">保存</BaseButton>
-          </div>
-        </div>
+      <div
+        v-if="menuOpen"
+        ref="menuEl"
+        class="ctx-menu"
+        role="menu"
+        :style="{ left: `${menuPos.x}px`, top: `${menuPos.y}px` }"
+        @click.stop
+        @contextmenu.prevent
+      >
+        <button type="button" class="ctx-menu__item" role="menuitem" @click="menuMarkRead">
+          <AppIcon name="check" :size="15" />
+          <span>标记已读</span>
+        </button>
+        <button type="button" class="ctx-menu__item" role="menuitem" @click="menuTogglePin">
+          <AppIcon name="pin" :size="15" />
+          <span>{{ menuFriend?.isPinned ? '取消置顶' : '置顶' }}</span>
+        </button>
       </div>
     </Teleport>
-
-    <ConfirmDialog
-      :open="deleteOpen"
-      title="删除笔友"
-      message="删除后将移除这段笔友关系"
-      confirm-text="删除"
-      danger
-      @confirm="onDelete"
-      @cancel="deleteTarget = null"
-    />
   </div>
 </template>
 
@@ -362,6 +412,7 @@ async function onDelete(): Promise<void> {
 }
 /* 列表容器：仅负责纵向排列与间距，每个 item 是独立卡片 */
 .friend-list-panel {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -379,6 +430,9 @@ async function onDelete(): Promise<void> {
   color: var(--text-primary);
   text-align: left;
   cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
   transition:
     border-color var(--duration-fast) var(--ease-standard),
     transform var(--duration-fast) var(--ease-standard),
@@ -392,6 +446,7 @@ async function onDelete(): Promise<void> {
 .list-item__avatar {
   position: relative;
   flex-shrink: 0;
+  cursor: pointer;
 }
 .list-item__dot {
   position: absolute;
@@ -420,6 +475,9 @@ async function onDelete(): Promise<void> {
   flex-wrap: wrap;
   gap: 6px;
 }
+.friend-pin {
+  color: var(--accent-primary);
+}
 .list-item__name {
   font-size: 14px;
   font-weight: 600;
@@ -439,9 +497,7 @@ async function onDelete(): Promise<void> {
 .friend-list {
   display: flex;
   flex-direction: column;
-  list-style: none;
-  margin: 0;
-  padding: 0;
+  gap: var(--space-3);
 }
 .friend-row {
   display: flex;
@@ -513,7 +569,7 @@ async function onDelete(): Promise<void> {
   background: var(--bg-secondary);
   color: var(--text-secondary);
 }
-.friend-row__setting {
+.friend-row__profile {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -526,111 +582,72 @@ async function onDelete(): Promise<void> {
   color: var(--text-muted);
   cursor: pointer;
 }
-.friend-row__setting:hover {
+.friend-row__profile:hover {
   color: var(--accent-primary);
-  background: var(--bg-card);
+  background: var(--bg-secondary);
 }
-.settings {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  animation: modal-fade var(--duration-fast) var(--ease-standard);
+
+/* 置顶 / 未读引起的重排动画 */
+.friend-move {
+  transition: transform 350ms var(--ease-standard);
 }
-@keyframes modal-fade {
-  from { opacity: 0; }
-  to { opacity: 1; }
+.friend-enter-active {
+  transition:
+    opacity 300ms var(--ease-standard),
+    transform 300ms var(--ease-standard);
 }
-.settings__scrim {
+.friend-leave-active {
   position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
+  width: 100%;
+  transition:
+    opacity 220ms var(--ease-standard),
+    transform 220ms var(--ease-standard);
 }
-.settings__card {
-  position: relative;
-  z-index: 1;
-  width: min(92vw, 420px);
-  padding: 22px;
-  border-radius: var(--radius-xl);
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
+.friend-enter-from,
+.friend-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+/* 上下文菜单 */
+.ctx-menu {
+  position: fixed;
+  z-index: 1200;
+  display: flex;
+  flex-direction: column;
+  width: 160px;
+  padding: 4px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
   box-shadow: var(--shadow-floating);
 }
-.settings__head {
+.ctx-menu__item {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--space-4);
-}
-.settings__title {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-.settings__close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
+  gap: var(--space-2);
+  width: 100%;
+  padding: 9px 10px;
   border: none;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--text-muted);
+  color: var(--text-primary);
+  font-size: 13px;
+  text-align: left;
   cursor: pointer;
 }
-.settings__close:hover {
-  color: var(--text-primary);
+.ctx-menu__item:hover {
   background: var(--bg-secondary);
-}
-.settings__body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-.settings__field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-.settings__control {
-  width: 100%;
-  padding: 9px 12px;
-  font-size: 14px;
-  font-family: var(--font-body);
-  color: var(--text-primary);
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-}
-.settings__control:focus {
-  outline: none;
-  border-color: var(--accent-primary);
-}
-.settings__delete {
-  align-self: flex-start;
-  padding: 4px 0;
-  border: none;
-  background: transparent;
-  color: var(--danger);
-  font-size: 13px;
-  cursor: pointer;
-}
-.settings__actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-2);
-  margin-top: var(--space-5);
+  color: var(--accent-primary);
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .friend-move,
+  .friend-enter-active,
+  .friend-leave-active {
+    transition: none;
+  }
+}
 @media (max-width: 640px) {
   .list-item {
     padding: var(--space-3);

@@ -131,6 +131,11 @@ async function selectConversation(conv: Conversation): Promise<void> {
   })
 }
 
+function openPeerProfile(): void {
+  if (!activeConv.value) return
+  void router.push(`/friends/${activeConv.value.peer.id}/profile`)
+}
+
 async function submit(): Promise<void> {
   if (activeId.value === null) return
   const text = draft.value.trim()
@@ -161,13 +166,20 @@ async function submit(): Promise<void> {
         >
           <AppIcon name="chevron-left" :size="18" />
         </button>
-        <UserAvatar
-          class="chat-window__peer-avatar"
-          :name="activeConv.peer.displayName"
-          :url="activeConv.peer.avatarUrl"
-          :size="34"
-          :title="activeConv.peer.displayName"
-        />
+        <button
+          type="button"
+          class="chat-window__peer"
+          title="查看笔友资料"
+          aria-label="查看笔友资料"
+          @click="openPeerProfile"
+        >
+          <UserAvatar
+            :name="activeConv.peer.displayName"
+            :url="activeConv.peer.avatarUrl"
+            :size="34"
+            :title="activeConv.peer.displayName"
+          />
+        </button>
       </header>
 
       <div ref="messageListEl" class="chat-window__messages">
@@ -261,6 +273,20 @@ async function submit(): Promise<void> {
 .chat-window__back:hover {
   color: var(--accent-primary);
   background: var(--bg-secondary);
+}
+.chat-window__peer {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
+  cursor: pointer;
+  transition: opacity var(--duration-fast) var(--ease-standard);
+}
+.chat-window__peer:hover {
+  opacity: 0.8;
 }
 .chat-window__messages {
   flex: 1;

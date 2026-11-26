@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
+import * as chatApi from '@/modules/chat/api/chat.api'
 import * as friendsApi from '../api/friends.api'
 import type { Friend, FriendBrief, FriendSettings } from '../types/friends.types'
 
@@ -75,6 +76,20 @@ export const useFriendsStore = defineStore('friends', () => {
     }
   }
 
+  /** 标记该笔友发来的消息为已读，并刷新列表清掉未读角标 */
+  async function markRead(userId: number): Promise<boolean> {
+    error.value = null
+    try {
+      const conversation = await chatApi.openChatWith(userId)
+      await chatApi.markConversationRead(conversation.id)
+      await loadFriends()
+      return true
+    } catch (e: any) {
+      error.value = e?.response?.data?.detail || '标记已读失败'
+      return false
+    }
+  }
+
   async function remove(friendshipId: number): Promise<boolean> {
     error.value = null
     try {
@@ -111,6 +126,7 @@ export const useFriendsStore = defineStore('friends', () => {
     add,
     accept,
     updateSettings,
+    markRead,
     remove,
     search,
   }

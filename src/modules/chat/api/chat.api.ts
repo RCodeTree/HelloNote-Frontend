@@ -77,3 +77,8 @@ export async function openChatWith(userId: number): Promise<Conversation> {
   const { data } = await http.post<RawConversation>(`/chats/with/${userId}`)
   return mapConversation(data)
 }
+
+/** 把指定会话中对方发来的消息标记为已读 */
+export async function markConversationRead(conversationId: number): Promise<void> {
+  await http.post(`/chats/${conversationId}/read`)
+}

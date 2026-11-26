@@ -26,6 +26,8 @@ export interface Friend {
   closeness: FriendCloseness
   /** 未读消息数 */
   unreadCount: number
+  /** 是否置顶 */
+  isPinned: boolean
 }
 
 /** 好友设置载荷（前端 camelCase，api 层映射为 snake_case） */
@@ -34,6 +36,7 @@ export interface FriendSettings {
   privacy?: FriendPrivacy
   relationType?: string
   closeness?: FriendCloseness
+  isPinned?: boolean
 }
 
 export interface FriendBrief {
