@@ -9,6 +9,7 @@ import EmptyState from '@/components/feedback/EmptyState.vue'
 import { useToast } from '@/composables/useToast'
 import { useAuthStore } from '@/modules/auth/stores/auth.store'
 import { useNotificationsStore } from '@/modules/notifications/stores/notifications.store'
+import { useFriendsStore } from '@/modules/friends/stores/friends.store'
 import { useChatStore } from '../stores/chat.store'
 import type { Conversation } from '../types/chat.types'
 
@@ -16,9 +17,11 @@ const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 const store = useChatStore()
+const friendsStore = useFriendsStore()
 const notifications = useNotificationsStore()
 const toast = useToast()
 const { conversations, messagesByConv, messagesLoading, sending, error } = storeToRefs(store)
+const { friends } = storeToRefs(friendsStore)
 
 const activeId = ref<number | null>(null)
 const draft = ref('')
@@ -42,6 +45,12 @@ const messages = computed(() => (activeId.value === null ? [] : messagesByConv.v
 const myId = computed(() => auth.user?.id ?? null)
 // 自己的头像昵称取登录用户，对方取会话 peer
 const me = computed(() => auth.user)
+// 对方：优先显示笔友备注（从好友列表按 userId 匹配），无备注回退原昵称
+const peerFriend = computed(() =>
+  activeConv.value ? friends.value.find((f) => f.userId === activeConv.value!.peer.id) ?? null : null,
+)
+const peerName = computed(() => peerFriend.value?.note || activeConv.value?.peer.displayName || '笔友')
+const peerAvatar = computed(() => peerFriend.value?.avatarUrl ?? activeConv.value?.peer.avatarUrl ?? null)
 
 const TIME_GROUP_MS = 5 * 60 * 1000
 
@@ -88,6 +97,8 @@ async function openFromRoute(): Promise<void> {
 
 onMounted(async () => {
   if (!auth.user && auth.token) await auth.fetchUser()
+  // 确保好友备注已加载，聊天窗口才能显示备注而非原昵称
+  if (!friends.value.length) void friendsStore.loadFriends()
   await openFromRoute()
   pollTimer = window.setInterval(() => {
     if (activeId.value !== null) void store.loadMessages(activeId.value)
@@ -174,10 +185,10 @@ async function submit(): Promise<void> {
           @click="openPeerProfile"
         >
           <UserAvatar
-            :name="activeConv.peer.displayName"
-            :url="activeConv.peer.avatarUrl"
+            :name="peerName"
+            :url="peerAvatar"
             :size="34"
-            :title="activeConv.peer.displayName"
+            :title="peerName"
           />
         </button>
       </header>
@@ -194,13 +205,13 @@ async function submit(): Promise<void> {
             >
               <UserAvatar
                 class="msg__avatar"
-                :name="myId !== null && msg.senderId === myId ? (me?.displayName || '我') : activeConv.peer.displayName"
-                :url="myId !== null && msg.senderId === myId ? (me?.avatarUrl ?? null) : activeConv.peer.avatarUrl"
+                :name="myId !== null && msg.senderId === myId ? (me?.displayName || '我') : peerName"
+                :url="myId !== null && msg.senderId === myId ? (me?.avatarUrl ?? null) : peerAvatar"
                 :size="34"
               />
               <div class="msg__main">
                 <span class="msg__name">
-                  {{ myId !== null && msg.senderId === myId ? (me?.displayName || '我') : activeConv.peer.displayName }}
+                  {{ myId !== null && msg.senderId === myId ? (me?.displayName || '我') : peerName }}
                 </span>
                 <div class="msg__bubble">{{ msg.content }}</div>
               </div>

@@ -113,8 +113,11 @@ async function onDelete(): Promise<void> {
       </header>
 
       <section class="profile-hero">
-        <UserAvatar :name="friend.displayName" :url="friend.avatarUrl" :size="72" />
+        <UserAvatar :name="friend.note || friend.displayName" :url="friend.avatarUrl" :size="72" />
         <h1 class="profile-hero__name">{{ friend.note || friend.displayName }}</h1>
+        <span v-if="friend.note && friend.note !== friend.displayName" class="profile-hero__origin">
+          原昵称：{{ friend.displayName }}
+        </span>
         <span class="profile-hero__username">@{{ friend.username }}</span>
         <p v-if="friend.bio" class="profile-hero__bio">{{ friend.bio }}</p>
       </section>
@@ -216,6 +219,11 @@ async function onDelete(): Promise<void> {
   font-size: 20px;
   font-weight: 600;
   color: var(--text-primary);
+}
+.profile-hero__origin {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 .profile-hero__username {
   font-size: 13px;

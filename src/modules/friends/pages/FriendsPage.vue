@@ -307,14 +307,6 @@ async function menuTogglePin(): Promise<void> {
               </span>
               <span class="list-item__sub">@{{ friend.username }}</span>
             </span>
-            <button
-              type="button"
-              class="friend-row__profile"
-              aria-label="查看笔友资料"
-              @click.stop="openProfile(friend)"
-            >
-              <AppIcon name="user" :size="16" />
-            </button>
           </div>
         </TransitionGroup>
       </template>
@@ -569,24 +561,6 @@ async function menuTogglePin(): Promise<void> {
   background: var(--bg-secondary);
   color: var(--text-secondary);
 }
-.friend-row__profile {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  flex-shrink: 0;
-  border: none;
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-}
-.friend-row__profile:hover {
-  color: var(--accent-primary);
-  background: var(--bg-secondary);
-}
-
 /* 置顶 / 未读引起的重排动画 */
 .friend-move {
   transition: transform 350ms var(--ease-standard);
